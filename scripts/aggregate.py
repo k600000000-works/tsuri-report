@@ -256,6 +256,9 @@ def main():
     summary = {"base_date": raw["base_date"], "week": list(weeks[0]), "weeks": [list(w) for w in weeks],
                "lastyear": raw["lastyear"], "groups": []}
     digest = [f"# 判定用ダイジェスト {raw['base_date']}（今週 {weeks[0][0]}〜 / 推移は古い週→今週 / 前年 {ly_lo}〜{ly_hi}）\n"]
+    st = raw.get("fetch_stats") or {}
+    if st and (st.get("ok", 0) + st.get("fail", 0)) and st["fail"] / (st["ok"] + st["fail"]) > 0.5:
+        digest.append(f"\n**警告: 取得の半分以上が失敗（成功 {st['ok']} / 失敗 {st['fail']}）。公開せず、メールで知らせること。**\n")
     fmt = lambda t: f"{t['when']}・{t['where']}で{t['fish']}" + (f"（{t['self']}）" if t["self"] else "")
     digest.append("\n## 本人の釣行（ぼかし済み。公開物に書くときもこの粒度まで。日付・船宿名・同行者は書かない）\n")
     digest.append("- 2か月以内に行った魚種（狙い目 picks から外し、外したことを excluded に書く）: "

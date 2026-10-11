@@ -31,7 +31,8 @@ python scripts/collect.py            # 10分前後。data/raw/<日付>.json（�
 python scripts/aggregate.py <日付>   # data/summary/<日付>.json と data/digest/<日付>.md
 ```
 
-取得に失敗した船宿があっても止めずに続ける。全体の半分以上が失敗していたら、そのことを通知メールに書く。
+取得に失敗した船宿があっても止めずに続ける。
+**ただし、collect.py が「取得の半分以上が失敗しました」と出した場合（digest の先頭にも警告が出る）は、レポートを公開しない（render も commit も push もしない）。** 本人あてに「今週は取得に失敗したため公開を見送った」こと、失敗の内容（例: Tunnel connection failed: 403 → 実行環境のネットワーク許可が必要）をメールで知らせて終える。
 途中で止まったときは `python scripts/collect.py --merge` で、取れていない船宿だけ取り直せる。
 
 ## 2. 判定する（ここが Claude の仕事）

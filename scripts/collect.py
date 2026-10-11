@@ -29,16 +29,21 @@ COMMENT_RE = re.compile(r'catch_item_comment_txt">(.*?)<span', re.S)
 NUM_RE = re.compile(r'([\d.]+)')
 
 
+STATS = {"ok": 0, "fail": 0}
+
+
 def get(url):
     for i in range(3):
         try:
             b = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30).read()
+            STATS["ok"] += 1
             try:
                 return b.decode("utf-8")
             except UnicodeDecodeError:
                 return b.decode("cp932", "replace")
         except Exception as e:  # noqa: BLE001
             if i == 2:
+                STATS["fail"] += 1
                 print(f"  ! 取得失敗 {url}: {e}", file=sys.stderr)
                 return ""
             time.sleep(3)
@@ -360,6 +365,11 @@ def main():
             ships.append({**s, "url": url, "catches": cur, "lastyear": last})
         out["groups"].append({"name": g["name"], "ships": ships})
 
+    out["fetch_stats"] = STATS
+    total = STATS["ok"] + STATS["fail"]
+    print(f"取得: 成功 {STATS['ok']} / 失敗 {STATS['fail']}", file=sys.stderr)
+    if total and STATS["fail"] / total > 0.5:
+        print("!!! 取得の半分以上が失敗しました。レポートは公開せず、メールで知らせてください。", file=sys.stderr)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"saved {p}", file=sys.stderr)
