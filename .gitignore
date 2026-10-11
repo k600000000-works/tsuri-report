@@ -1,0 +1,4 @@
+data/raw/
+data/digest/
+data/summary/
+__pycache__/

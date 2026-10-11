@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>釣果レポート 10/11</title>
+<meta property="og:title" content="釣果レポート 10/11">
+<meta property="og:description" content="関東の港別・魚種別の船釣り釣果まとめ（毎週金曜更新）">
+<style>
+:root{--bg:#f4f1ea;--card:#fffdf8;--ink:#1d2321;--sub:#5d6662;--line:#e3ddd0;--accent:#0f6b5c;
+--hot:#d9480f;--hot-bg:#fff0e6;--up:#2b8a3e;--down:#868e96;--steady:#1c7ed6;}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121615;--card:#1b2120;--ink:#e9ece9;--sub:#9aa5a0;--line:#2c3432;
+--accent:#4fc3a9;--hot:#ff8a4c;--hot-bg:#3a2216;--up:#69db7c;--down:#868e96;--steady:#74c0fc;}}
+:root[data-theme="dark"]{--bg:#121615;--card:#1b2120;--ink:#e9ece9;--sub:#9aa5a0;--line:#2c3432;--accent:#4fc3a9;--hot:#ff8a4c;--hot-bg:#3a2216;--up:#69db7c;--down:#868e96;--steady:#74c0fc;}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;-webkit-text-size-adjust:100%}
+.deck{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth}
+.slide{flex:0 0 100%;max-width:100%;height:100%;overflow-y:auto;scroll-snap-align:start;padding:20px 16px 72px}
+.slide>*{max-width:640px;margin-left:auto;margin-right:auto}
+.eyebrow{font-size:13px;color:var(--accent);font-weight:700;letter-spacing:.08em}
+h1{font-size:28px;margin:6px auto 2px}
+.period{color:var(--sub);font-size:13px;margin-top:0}
+.headline{font-size:16px;line-height:1.6;background:var(--card);border-left:4px solid var(--accent);padding:10px 12px;border-radius:6px}
+.sec{font-size:15px;margin:22px auto 10px;color:var(--sub)}
+.picks{display:grid;gap:10px}
+.pick{display:block;text-decoration:none;color:inherit;background:var(--hot-bg);border:2px solid var(--hot);border-radius:14px;padding:14px 16px}
+.pick-where{font-size:12px;color:var(--hot);font-weight:700}
+.pick-fish{font-size:24px;font-weight:800;margin:2px 0 4px}
+.pick-why{font-size:14px;line-height:1.55}
+.toc{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.toc a{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-decoration:none;color:inherit;font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:center}
+.toc a span{font-weight:400;font-size:12px;color:var(--sub)}
+.hint{color:var(--sub);font-size:12px;text-align:center;margin-top:18px}
+.g-head{display:flex;justify-content:space-between;align-items:baseline}
+.g-head h2{font-size:24px;margin:0}
+.back{font-size:13px;color:var(--accent)}
+.g-summary{font-size:15px;line-height:1.6;margin:8px auto}
+.legend{font-size:11px;color:var(--sub);margin:6px auto 10px}
+.rows{display:grid;gap:8px}
+.row{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:2px 10px}
+.row.is-hot{border:2px solid var(--hot);background:var(--hot-bg)}
+.row.minor{opacity:.6}
+.f-name{font-weight:800;font-size:17px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.f-num{text-align:right;grid-row:span 2}
+.f-num b{font-size:24px}.f-num small{font-size:12px;margin-left:1px}
+.top{display:block;font-size:11px;color:var(--sub)}
+.size{font-size:11px}
+.f-trend{font-size:13px;display:flex;gap:10px}
+.f-meta{font-size:11px;color:var(--sub)}
+.note{grid-column:1/-1;font-size:13px;line-height:1.5;margin-top:4px;color:var(--ink)}
+.pos{color:var(--up);font-weight:700}.neg{color:var(--down);font-weight:700}.flat{color:var(--sub)}.na{color:var(--sub)}
+.badge{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;color:#fff}
+.badge.hot{background:var(--hot)}.badge.up{background:var(--up)}.badge.steady{background:var(--steady)}.badge.down{background:var(--down)}
+.sources{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px}
+.sources summary{cursor:pointer;font-weight:700}
+.sources ul{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:6px}
+.sources li{display:flex;justify-content:space-between}
+.sources a{color:var(--accent)}
+.sources span{color:var(--sub);font-size:12px}
+.empty{color:var(--sub)}
+.foot{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:6px;padding:10px;background:linear-gradient(transparent,var(--bg) 40%)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--line)}.dot.on{background:var(--accent)}
+.foot a{position:absolute;right:16px;bottom:8px;font-size:11px;color:var(--sub)}
+</style>
+</head>
+<body>
+<main class="deck" id="deck">
+  <section class="slide cover" id="top">
+    <div class="eyebrow">船釣り 週間釣果レポート</div>
+    <h1>10月11日（日）号</h1>
+    <p class="period">集計: 10/05〜10/11 の釣果</p>
+    <p class="headline">東京湾口のタチウオが「爆裂」モード、鹿島は夜スジイカと大ダイが熱い。茨城・相模湾はウネリの影響が残るので出船確認を。</p>
+    <h2 class="sec">🔥 今週行くべき</h2>
+    <div class="picks">
+      <a class="pick" href="#g-東京湾口">
+        <div class="pick-where">東京湾口</div>
+        <div class="pick-fish">タチウオ</div>
+        <div class="pick-why">教至丸「ば く れ つ」「好調キープ」、五郎丸・黒川本家も好調。前週比+44%、竿頭54本でドラゴン級も混じる。</div>
+      </a>
+      <a class="pick" href="#g-鹿島">
+        <div class="pick-where">鹿島</div>
+        <div class="pick-fish">スジイカ</div>
+        <div class="pick-why">夜イカが連日多点掛けで、平均200杯超・竿頭420杯。3日続けてクーラー満タンで早上がり。前年の約4倍。</div>
+      </a>
+      <a class="pick" href="#g-鹿島">
+        <div class="pick-where">鹿島</div>
+        <div class="pick-fish">マダイ</div>
+        <div class="pick-why">8軒が出船し、前年比+71%。不動丸は竿頭23枚。幸栄丸・清栄丸では4.5〜5.6kgの大ダイが続出。</div>
+      </a></div>
+    <h2 class="sec">港</h2>
+    <nav class="toc"><a href="#g-横浜・金沢八景">横浜・金沢八景<span>6魚種</span></a><a href="#g-東京湾口">東京湾口<span>10魚種</span></a><a href="#g-内房">内房<span>2魚種</span></a><a href="#g-相模湾東側">相模湾東側<span>10魚種</span></a><a href="#g-那珂湊・大洗">那珂湊・大洗<span>1魚種</span></a><a href="#g-鹿島">鹿島<span>5魚種</span></a></nav>
+    <p class="hint">→ 横にスワイプで港ごとのページ</p>
+  </section>
+  <section class="slide" id="g-横浜・金沢八景">
+    <header class="g-head"><h2>横浜・金沢八景</h2><a class="back" href="#top">表紙へ</a></header>
+    <p class="g-summary">アジは14軒が出船していて安定しています。フグとタチウオが上向き。</p>
+    <div class="legend">数字＝1人あたりの釣果（各船宿の竿頭〜スソの中間を船宿ごとに平均し、さらに船宿間で平均）</div>
+    <div class="rows">
+      <div class="row">
+        <div class="f-name">アジ<span class="badge up">上向き</span></div>
+        <div class="f-num"><b>37</b><small>匹</small><span class="top">竿頭 115 <span class="size">最大48cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="flat">→8%</span></span><span>前年 <span class="pos">↑18%</span></span></div>
+        <div class="f-meta">14軒・41便</div>
+        <div class="note">前年比+18%。仁丸は竿頭115匹で、大アジやカンパチも混じる。サバフグ対策で仕掛けを多めに。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">タチウオ<span class="badge up">上向き</span></div>
+        <div class="f-num"><b>12</b><small>匹</small><span class="top">竿頭 38 <span class="size">最大130cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="pos">↑28%</span></span><span>前年 <span class="neg">↓27%</span></span></div>
+        <div class="f-meta">4軒・12便</div>
+        <div class="note">荒川屋は「終日当たりが途切れない高活性」。前週比+28%。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">フグ<span class="badge up">上向き</span></div>
+        <div class="f-num"><b>13</b><small>匹</small><span class="top">竿頭 24 <span class="size">最大38cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="pos">↑91%</span></span><span>前年 <span class="na">—</span></span></div>
+        <div class="f-meta">2軒・5便</div>
+        <div class="note">野毛屋は「太りすぎ中型大型揃い」で1〜32匹。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">マダイ<span class="badge steady">安定</span></div>
+        <div class="f-num"><b>1.5</b><small>匹</small><span class="top">竿頭 6 <span class="size">最大4kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓21%</span></span><span>前年 <span class="neg">↓29%</span></span></div>
+        <div class="f-meta">4軒・10便</div>
+        <div class="note">野毛屋はテンヤで船中35枚、トップ6枚。ほかの船宿は苦戦気味。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">シロギス<span class="badge steady">安定</span></div>
+        <div class="f-num"><b>47</b><small>匹</small><span class="top">竿頭 122 <span class="size">最大23cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓23%</span></span><span>前年 <span class="pos">↑33%</span></span></div>
+        <div class="f-meta">2軒・5便</div>
+        <div class="note">広島屋は竿頭122匹。前年比+33%。フグにハリスを切られやすい。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">アオリイカ<span class="badge down">低調</span></div>
+        <div class="f-num"><b>1</b><small>匹</small><span class="top">竿頭 2 <span class="size">最大0.5kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓33%</span></span><span>前年 <span class="neg">↓73%</span></span></div>
+        <div class="f-meta">1軒・2便</div>
+        <div class="note">顔を見た程度。</div>
+      </div></div>
+    <details class="sources"><summary>出典の釣船屋（15軒）</summary><ul><li><a href="https://www.chowari.jp/ship/00703/catch/" target="_blank" rel="noopener">忠彦丸</a><span>14件</span></li><li><a href="https://www.chowari.jp/ship/00007/catch/" target="_blank" rel="noopener">荒川屋</a><span>11件</span></li><li><a href="https://www.chowari.jp/ship/00836/catch/" target="_blank" rel="noopener">米元釣船店</a><span>10件</span></li><li><a href="https://www.chowari.jp/ship/01580/catch/" target="_blank" rel="noopener">村本海事</a><span>8件</span></li><li><a href="https://www.chowari.jp/ship/00834/catch/" target="_blank" rel="noopener">野毛屋釣船店</a><span>7件</span></li><li><a href="https://www.chowari.jp/ship/00010/catch/" target="_blank" rel="noopener">仁丸</a><span>6件</span></li><li><a href="https://www.chowari.jp/ship/00008/catch/" target="_blank" rel="noopener">黒一丸</a><span>6件</span></li><li><a href="https://www.chowari.jp/ship/00150/catch/" target="_blank" rel="noopener">金沢八景</a><span>5件</span></li><li><a href="https://www.chowari.jp/ship/00734/catch/" target="_blank" rel="noopener">打木屋釣船店</a><span>3件</span></li><li><a href="https://www.chowari.jp/ship/01085/catch/" target="_blank" rel="noopener">はやぶさ丸</a><span>3件</span></li><li><a href="https://www.chowari.jp/ship/00918/catch/" target="_blank" rel="noopener">広島屋</a><span>2件</span></li><li><a href="https://www.chowari.jp/ship/00158/catch/" target="_blank" rel="noopener">黒川本家</a><span>2件</span></li><li><a href="https://www.chowari.jp/ship/00689/catch/" target="_blank" rel="noopener">青田丸</a><span>2件</span></li><li><a href="https://www.chowari.jp/ship/00862/catch/" target="_blank" rel="noopener">仁春丸</a><span>1件</span></li><li><a href="https://www.chowari.jp/ship/00141/catch/" target="_blank" rel="noopener">久保弘丸</a><span>1件</span></li></ul></details>
+  </section>
+  <section class="slide" id="g-東京湾口">
+    <header class="g-head"><h2>東京湾口</h2><a class="back" href="#top">表紙へ</a></header>
+    <p class="g-summary">タチウオが絶好調。剣崎沖のワラサ五目も盛り返してきています。</p>
+    <div class="legend">数字＝1人あたりの釣果（各船宿の竿頭〜スソの中間を船宿ごとに平均し、さらに船宿間で平均）</div>
+    <div class="rows">
+      <div class="row is-hot">
+        <div class="f-name">タチウオ<span class="badge hot">行くべき</span></div>
+        <div class="f-num"><b>16</b><small>匹</small><span class="top">竿頭 54 <span class="size">最大134cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="pos">↑44%</span></span><span>前年 <span class="neg">↓16%</span></span></div>
+        <div class="f-meta">5軒・16便</div>
+        <div class="note">走水〜台船西で、メーター超えのドラゴン級も多数。ショート便で十分に釣れる。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">ワラサ・イナダ<span class="badge up">上向き</span></div>
+        <div class="f-num"><b>1</b><small>匹</small><span class="top">竿頭 7 <span class="size">最大5kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="flat">→0%</span></span><span>前年 <span class="pos">↑43%</span></span></div>
+        <div class="f-meta">13軒・36便</div>
+        <div class="note">成銀丸・大松丸は「旋回するたびにヒット」。下浦沖はまだ渋い。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">マダイ<span class="badge up">上向き</span></div>
+        <div class="f-num"><b>3</b><small>匹</small><span class="top">竿頭 13 <span class="size">最大3.2kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓60%</span></span><span>前年 <span class="pos">↑50%</span></span></div>
+        <div class="f-meta">9軒・22便</div>
+        <div class="note">房丸「引き続き好調」、棒面丸はトップ4枚。前年比+50%。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">アジ<span class="badge steady">安定</span></div>
+        <div class="f-num"><b>32</b><small>匹</small><span class="top">竿頭 176 <span class="size">最大42cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="flat">→14%</span></span><span>前年 <span class="flat">→7%</span></span></div>
+        <div class="f-meta">8軒・21便</div>
+        <div class="note">潮が速くて釣りづらいものの、24〜30cmの良型でお土産は確保できている。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">カワハギ<span class="badge steady">安定</span></div>
+        <div class="f-num"><b>8.1</b><small>匹</small><span class="top">竿頭 23 <span class="size">最大34cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="flat">→1%</span></span><span>前年 <span class="flat">→2%</span></span></div>
+        <div class="f-meta">5軒・16便</div>
+        <div class="note">平均8枚、竿頭23枚で例年並み。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">アマダイ<span class="badge steady">安定</span></div>
+        <div class="f-num"><b>2.7</b><small>匹</small><span class="top">竿頭 10 <span class="size">最大50cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="flat">→4%</span></span><span>前年 <span class="flat">→13%</span></span></div>
+        <div class="f-meta">3軒・10便</div>
+        <div class="note">平均2〜3匹。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">シマアジ</div>
+        <div class="f-num"><b>1.2</b><small>匹</small><span class="top">竿頭 5 <span class="size">最大1.6kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓37%</span></span><span>前年 <span class="na">—</span></span></div>
+        <div class="f-meta">1軒・4便</div>
+        
+      </div>
+      <div class="row">
+        <div class="f-name">アオリイカ</div>
+        <div class="f-num"><b>3</b><small>匹</small><span class="top">竿頭 3</span></div>
+        <div class="f-trend"><span>前週 <span class="na">—</span></span><span>前年 <span class="neg">↓63%</span></span></div>
+        <div class="f-meta">1軒・2便</div>
+        
+      </div>
+      <div class="row">
+        <div class="f-name">キハダ</div>
+        <div class="f-num"><b>1</b><small>匹</small><span class="top">竿頭 3 <span class="size">最大34kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="na">—</span></span><span>前年 <span class="neg">↓29%</span></span></div>
+        <div class="f-meta">1軒・2便</div>
+        
+      </div>
+      <div class="row">
+        <div class="f-name">カツオ<span class="badge down">下降</span></div>
+        <div class="f-num"><b>2.7</b><small>匹</small><span class="top">竿頭 5 <span class="size">最大10.5kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="pos">↑69%</span></span><span>前年 <span class="neg">↓39%</span></span></div>
+        <div class="f-meta">3軒・6便</div>
+        <div class="note">前年比-39%。終盤戦。</div>
+      </div>
+      <div class="row minor">
+        <div class="f-name">イサキ</div>
+        <div class="f-num"><b>15</b><small>匹</small><span class="top">竿頭 30 <span class="size">最大33cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓57%</span></span><span>前年 <span class="neg">↓20%</span></span></div>
+        <div class="f-meta">1軒・1便・参考値</div>
+        
+      </div>
+      <div class="row minor">
+        <div class="f-name">カイワリ</div>
+        <div class="f-num"><b>4</b><small>匹</small><span class="top">竿頭 6 <span class="size">最大26cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓61%</span></span><span>前年 <span class="neg">↓90%</span></span></div>
+        <div class="f-meta">1軒・1便・参考値</div>
+        
+      </div>
+      <div class="row minor">
+        <div class="f-name">スルメイカ</div>
+        <div class="f-num"><b>3.5</b><small>匹</small><span class="top">竿頭 7 <span class="size">最大40cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="na">—</span></span><span>前年 <span class="na">—</span></span></div>
+        <div class="f-meta">1軒・1便・参考値</div>
+        
+      </div>
+      <div class="row minor">
+        <div class="f-name">カンパチ</div>
+        <div class="f-num"><b>1</b><small>匹</small><span class="top">竿頭 2 <span class="size">最大5kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="na">—</span></span><span>前年 <span class="na">—</span></span></div>
+        <div class="f-meta">1軒・1便・参考値</div>
+        
+      </div></div>
+    <details class="sources"><summary>出典の釣船屋（29軒）</summary><ul><li><a href="https://www.chowari.jp/ship/00288/catch/" target="_blank" rel="noopener">巳之助丸</a><span>11件</span></li><li><a href="https://www.chowari.jp/ship/00148/catch/" target="_blank" rel="noopener">五郎丸</a><span>10件</span></li><li><a href="https://www.chowari.jp/ship/00289/catch/" target="_blank" rel="noopener">山下丸</a><span>10件</span></li><li><a href="https://www.chowari.jp/ship/00453/catch/" target="_blank" rel="noopener">大松丸</a><span>10件</span></li><li><a href="https://www.chowari.jp/ship/00332/catch/" target="_blank" rel="noopener">成銀丸</a><span>9件</span></li><li><a href="https://www.chowari.jp/ship/01037/catch/" target="_blank" rel="noopener">浜鈴丸</a><span>7件</span></li><li><a href="https://www.chowari.jp/ship/01191/catch/" target="_blank" rel="noopener">伝五郎丸</a><span>7件</span></li><li><a href="https://www.chowari.jp/ship/00861/catch/" target="_blank" rel="noopener">政信丸</a><span>6件</span></li><li><a href="https://www.chowari.jp/ship/01219/catch/" target="_blank" rel="noopener">金重丸</a><span>6件</span></li><li><a href="https://www.chowari.jp/ship/00927/catch/" target="_blank" rel="noopener">丸又丸</a><span>6件</span></li><li><a href="https://www.chowari.jp/ship/00331/catch/" target="_blank" rel="noopener">棒面丸</a><span>6件</span></li><li><a href="https://www.chowari.jp/ship/00845/catch/" target="_blank" rel="noopener">教至丸</a><span>5件</span></li><li><a href="https://www.chowari.jp/ship/00690/catch/" target="_blank" rel="noopener">房丸</a><span>5件</span></li><li><a href="https://www.chowari.jp/ship/00457/catch/" target="_blank" rel="noopener">黒川本家</a><span>5件</span></li><li><a href="https://www.chowari.jp/ship/01696/catch/" target="_blank" rel="noopener">正海丸</a><span>5件</span></li><li><a href="https://www.chowari.jp/ship/00877/catch/" target="_blank" rel="noopener">治丸</a><span>4件</span></li><li><a href="https://www.chowari.jp/ship/00290/catch/" target="_blank" rel="noopener">やまてん丸</a><span>4件</span></li><li><a href="https://www.chowari.jp/ship/01600/catch/" target="_blank" rel="noopener">邦丸</a><span>4件</span></li><li><a href="https://www.chowari.jp/ship/00282/catch/" target="_blank" rel="noopener">瀬戸丸</a><span>4件</span></li><li><a href="https://www.chowari.jp/ship/01192/catch/" target="_blank" rel="noopener">新徳丸</a><span>4件</span></li><li><a href="https://www.chowari.jp/ship/01036/catch/" target="_blank" rel="noopener">あまさけや丸</a><span>4件</span></li><li><a href="https://www.chowari.jp/ship/01140/catch/" target="_blank" rel="noopener">健洋丸</a><span>3件</span></li><li><a href="https://www.chowari.jp/ship/00799/catch/" target="_blank" rel="noopener">せどおと丸</a><span>3件</span></li><li><a href="https://www.chowari.jp/ship/01379/catch/" target="_blank" rel="noopener">太郎八丸</a><span>3件</span></li><li><a href="https://www.chowari.jp/ship/01213/catch/" target="_blank" rel="noopener">岩伊丸</a><span>2件</span></li><li><a href="https://www.chowari.jp/ship/00919/catch/" target="_blank" rel="noopener">鈴茂丸</a><span>1件</span></li><li><a href="https://www.chowari.jp/ship/00797/catch/" target="_blank" rel="noopener">一郎丸</a><span>1件</span></li><li><a href="https://www.chowari.jp/ship/00929/catch/" target="_blank" rel="noopener">勇丸</a><span>1件</span></li><li><a href="https://www.chowari.jp/ship/00916/catch/" target="_blank" rel="noopener">孫武丸</a><span>1件</span></li></ul></details>
+  </section>
+  <section class="slide" id="g-内房">
+    <header class="g-head"><h2>内房</h2><a class="back" href="#top">表紙へ</a></header>
+    <p class="g-summary">アジ・カワハギとも先週より落ちています。</p>
+    <div class="legend">数字＝1人あたりの釣果（各船宿の竿頭〜スソの中間を船宿ごとに平均し、さらに船宿間で平均）</div>
+    <div class="rows">
+      <div class="row">
+        <div class="f-name">アジ<span class="badge down">下降</span></div>
+        <div class="f-num"><b>36</b><small>匹</small><span class="top">竿頭 111 <span class="size">最大48cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓22%</span></span><span>前年 <span class="neg">↓24%</span></span></div>
+        <div class="f-meta">3軒・6便</div>
+        <div class="note">前週比-22%、前年比-24%。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">カワハギ<span class="badge down">下降</span></div>
+        <div class="f-num"><b>8</b><small>匹</small><span class="top">竿頭 19 <span class="size">最大27cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓15%</span></span><span>前年 <span class="neg">↓33%</span></span></div>
+        <div class="f-meta">2軒・5便</div>
+        <div class="note">前年比-33%。</div>
+      </div>
+      <div class="row minor">
+        <div class="f-name">シロアマダイ</div>
+        <div class="f-num"><b>2</b><small>匹</small><span class="top">竿頭 2 <span class="size">最大39cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="na">—</span></span><span>前年 <span class="pos">↑100%</span></span></div>
+        <div class="f-meta">1軒・1便・参考値</div>
+        
+      </div>
+      <div class="row minor">
+        <div class="f-name">タチウオ</div>
+        <div class="f-num"><b>8</b><small>匹</small><span class="top">竿頭 12 <span class="size">最大115cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="na">—</span></span><span>前年 <span class="neg">↓60%</span></span></div>
+        <div class="f-meta">1軒・1便・参考値</div>
+        
+      </div></div>
+    <details class="sources"><summary>出典の釣船屋（5軒）</summary><ul><li><a href="https://www.chowari.jp/ship/00984/catch/" target="_blank" rel="noopener">勘次郎丸</a><span>4件</span></li><li><a href="https://www.chowari.jp/ship/01218/catch/" target="_blank" rel="noopener">加平丸</a><span>3件</span></li><li><a href="https://www.chowari.jp/ship/01422/catch/" target="_blank" rel="noopener">フィッシュオン大勝</a><span>3件</span></li><li><a href="https://www.chowari.jp/ship/00986/catch/" target="_blank" rel="noopener">彦次郎丸</a><span>2件</span></li><li><a href="https://www.chowari.jp/ship/01421/catch/" target="_blank" rel="noopener">福丸</a><span>1件</span></li></ul></details>
+  </section>
+  <section class="slide" id="g-相模湾東側">
+    <header class="g-head"><h2>相模湾東側</h2><a class="back" href="#top">表紙へ</a></header>
+    <p class="g-summary">ウネリと速潮で全体に苦戦。マダイ五目は上向きです。</p>
+    <div class="legend">数字＝1人あたりの釣果（各船宿の竿頭〜スソの中間を船宿ごとに平均し、さらに船宿間で平均）</div>
+    <div class="rows">
+      <div class="row">
+        <div class="f-name">マダイ<span class="badge up">上向き</span></div>
+        <div class="f-num"><b>2</b><small>匹</small><span class="top">竿頭 7 <span class="size">最大3.5kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="pos">↑122%</span></span><span>前年 <span class="pos">↑150%</span></span></div>
+        <div class="f-meta">4軒・9便</div>
+        <div class="note">前週の2倍。五目で外道も多彩。ただし元の数は少なめ。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">ヤリイカ<span class="badge up">上向き</span></div>
+        <div class="f-num"><b>8.2</b><small>匹</small><span class="top">竿頭 18 <span class="size">最大40cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="na">—</span></span><span>前年 <span class="neg">↓15%</span></span></div>
+        <div class="f-meta">3軒・5便</div>
+        <div class="note">洲崎沖で混じり始めた。11cmツノの用意を。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">イサキ<span class="badge steady">安定</span></div>
+        <div class="f-num"><b>18</b><small>匹</small><span class="top">竿頭 55 <span class="size">最大35cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="pos">↑27%</span></span><span>前年 <span class="pos">↑20%</span></span></div>
+        <div class="f-meta">3軒・8便</div>
+        <div class="note">多くの人が20匹前後。潮が速いと苦戦する。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">アマダイ<span class="badge steady">安定</span></div>
+        <div class="f-num"><b>2.7</b><small>匹</small><span class="top">竿頭 8 <span class="size">最大42cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="flat">→13%</span></span><span>前年 <span class="flat">→13%</span></span></div>
+        <div class="f-meta">4軒・7便</div>
+        <div class="note">平均2〜3匹。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">キハダ</div>
+        <div class="f-num"><b>1.1</b><small>匹</small><span class="top">竿頭 2 <span class="size">最大57kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="pos">↑38%</span></span><span>前年 <span class="neg">↓35%</span></span></div>
+        <div class="f-meta">3軒・6便</div>
+        
+      </div>
+      <div class="row">
+        <div class="f-name">カワハギ</div>
+        <div class="f-num"><b>6.2</b><small>匹</small><span class="top">竿頭 14 <span class="size">最大29cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓16%</span></span><span>前年 <span class="pos">↑41%</span></span></div>
+        <div class="f-meta">2軒・5便</div>
+        
+      </div>
+      <div class="row">
+        <div class="f-name">アジ</div>
+        <div class="f-num"><b>23</b><small>匹</small><span class="top">竿頭 38 <span class="size">最大40cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="pos">↑66%</span></span><span>前年 <span class="pos">↑21%</span></span></div>
+        <div class="f-meta">1軒・3便</div>
+        
+      </div>
+      <div class="row">
+        <div class="f-name">シイラ</div>
+        <div class="f-num"><b>4.8</b><small>匹</small><span class="top">竿頭 8 <span class="size">最大70cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="pos">↑20%</span></span><span>前年 <span class="na">—</span></span></div>
+        <div class="f-meta">2軒・2便</div>
+        
+      </div>
+      <div class="row">
+        <div class="f-name">スルメイカ<span class="badge down">下降</span></div>
+        <div class="f-num"><b>6.8</b><small>匹</small><span class="top">竿頭 30 <span class="size">最大43cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓56%</span></span><span>前年 <span class="neg">↓20%</span></span></div>
+        <div class="f-meta">4軒・12便</div>
+        <div class="note">反応が薄く前週比-56%。ヤリイカに切り替わりつつある。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">カツオ<span class="badge down">下降</span></div>
+        <div class="f-num"><b>1.2</b><small>匹</small><span class="top">竿頭 5 <span class="size">最大9kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓50%</span></span><span>前年 <span class="neg">↓62%</span></span></div>
+        <div class="f-meta">6軒・11便</div>
+        <div class="note">前年比-62%。</div>
+      </div>
+      <div class="row minor">
+        <div class="f-name">クロムツ</div>
+        <div class="f-num"><b>6.5</b><small>匹</small><span class="top">竿頭 8 <span class="size">最大40cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓55%</span></span><span>前年 <span class="na">—</span></span></div>
+        <div class="f-meta">1軒・1便・参考値</div>
+        
+      </div>
+      <div class="row minor">
+        <div class="f-name">カンパチ</div>
+        <div class="f-num"><b>1</b><small>匹</small><span class="top">竿頭 1 <span class="size">最大4kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="na">—</span></span><span>前年 <span class="neg">↓50%</span></span></div>
+        <div class="f-meta">1軒・1便・参考値</div>
+        
+      </div>
+      <div class="row minor">
+        <div class="f-name">シロアマダイ</div>
+        <div class="f-num"><b>1</b><small>匹</small><span class="top">竿頭 1 <span class="size">最大40cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="na">—</span></span><span>前年 <span class="neg">↓38%</span></span></div>
+        <div class="f-meta">1軒・1便・参考値</div>
+        
+      </div>
+      <div class="row minor">
+        <div class="f-name">サワラ</div>
+        <div class="f-num"><b>0.5</b><small>匹</small><span class="top">竿頭 1 <span class="size">最大2.8kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓83%</span></span><span>前年 <span class="na">—</span></span></div>
+        <div class="f-meta">1軒・1便・参考値</div>
+        
+      </div>
+      <div class="row minor">
+        <div class="f-name">キンメダイ</div>
+        <div class="f-num"><b>13</b><small>匹</small><span class="top">竿頭 20 <span class="size">最大40cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="na">—</span></span><span>前年 <span class="na">—</span></span></div>
+        <div class="f-meta">1軒・1便・参考値</div>
+        
+      </div></div>
+    <details class="sources"><summary>出典の釣船屋（21軒）</summary><ul><li><a href="https://www.chowari.jp/ship/00296/catch/" target="_blank" rel="noopener">佐島海楽園</a><span>8件</span></li><li><a href="https://www.chowari.jp/ship/00449/catch/" target="_blank" rel="noopener">たいぞう丸</a><span>8件</span></li><li><a href="https://www.chowari.jp/ship/01060/catch/" target="_blank" rel="noopener">春盛丸</a><span>6件</span></li><li><a href="https://www.chowari.jp/ship/00454/catch/" target="_blank" rel="noopener">光三丸</a><span>5件</span></li><li><a href="https://www.chowari.jp/ship/00451/catch/" target="_blank" rel="noopener">愛正丸</a><span>5件</span></li><li><a href="https://www.chowari.jp/ship/00450/catch/" target="_blank" rel="noopener">長三朗丸</a><span>5件</span></li><li><a href="https://www.chowari.jp/ship/00346/catch/" target="_blank" rel="noopener">志平丸</a><span>4件</span></li><li><a href="https://www.chowari.jp/ship/01075/catch/" target="_blank" rel="noopener">太郎丸</a><span>4件</span></li><li><a href="https://www.chowari.jp/ship/01057/catch/" target="_blank" rel="noopener">辰丸</a><span>3件</span></li><li><a href="https://www.chowari.jp/ship/00872/catch/" target="_blank" rel="noopener">孝漁丸</a><span>3件</span></li><li><a href="https://www.chowari.jp/ship/00900/catch/" target="_blank" rel="noopener">はじめ丸</a><span>3件</span></li><li><a href="https://www.chowari.jp/ship/00796/catch/" target="_blank" rel="noopener">深田正夫丸</a><span>3件</span></li><li><a href="https://www.chowari.jp/ship/00318/catch/" target="_blank" rel="noopener">五エム丸</a><span>3件</span></li><li><a href="https://www.chowari.jp/ship/00811/catch/" target="_blank" rel="noopener">道乗丸</a><span>2件</span></li><li><a href="https://www.chowari.jp/ship/01467/catch/" target="_blank" rel="noopener">哲夫丸</a><span>2件</span></li><li><a href="https://www.chowari.jp/ship/01470/catch/" target="_blank" rel="noopener">海力丸</a><span>2件</span></li><li><a href="https://www.chowari.jp/ship/00144/catch/" target="_blank" rel="noopener">つね丸</a><span>2件</span></li><li><a href="https://www.chowari.jp/ship/00156/catch/" target="_blank" rel="noopener">福栄丸</a><span>2件</span></li><li><a href="https://www.chowari.jp/ship/00766/catch/" target="_blank" rel="noopener">かねい丸</a><span>1件</span></li><li><a href="https://www.chowari.jp/ship/01466/catch/" target="_blank" rel="noopener">健海丸</a><span>1件</span></li><li><a href="https://www.chowari.jp/ship/01584/catch/" target="_blank" rel="noopener">椿丸</a><span>1件</span></li></ul></details>
+  </section>
+  <section class="slide" id="g-那珂湊・大洗">
+    <header class="g-head"><h2>那珂湊・大洗</h2><a class="back" href="#top">表紙へ</a></header>
+    <p class="g-summary">タコは底荒れで数が落ちています。海が落ち着けば戻りそう。</p>
+    <div class="legend">数字＝1人あたりの釣果（各船宿の竿頭〜スソの中間を船宿ごとに平均し、さらに船宿間で平均）</div>
+    <div class="rows">
+      <div class="row">
+        <div class="f-name">タコ<span class="badge down">下降</span></div>
+        <div class="f-num"><b>6.5</b><small>匹</small><span class="top">竿頭 15 <span class="size">最大1.8kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓40%</span></span><span>前年 <span class="neg">↓37%</span></span></div>
+        <div class="f-meta">3軒・9便</div>
+        <div class="note">前週比-40%。それでも栄光丸は5〜13杯、型も良くなっている。</div>
+      </div>
+      <div class="row minor">
+        <div class="f-name">マダイ</div>
+        <div class="f-num"><b>4</b><small>匹</small><span class="top">竿頭 7</span></div>
+        <div class="f-trend"><span>前週 <span class="na">—</span></span><span>前年 <span class="na">—</span></span></div>
+        <div class="f-meta">1軒・1便・参考値</div>
+        
+      </div></div>
+    <details class="sources"><summary>出典の釣船屋（3軒）</summary><ul><li><a href="https://www.chowari.jp/ship/00972/catch/" target="_blank" rel="noopener">第二つれたか丸</a><span>4件</span></li><li><a href="https://www.chowari.jp/ship/01121/catch/" target="_blank" rel="noopener">仙昇丸</a><span>4件</span></li><li><a href="https://www.chowari.jp/ship/01238/catch/" target="_blank" rel="noopener">栄光丸</a><span>2件</span></li></ul></details>
+  </section>
+  <section class="slide" id="g-鹿島">
+    <header class="g-head"><h2>鹿島</h2><a class="back" href="#top">表紙へ</a></header>
+    <p class="g-summary">夜スジイカと大ダイの2本立て。フグも上向きです。</p>
+    <div class="legend">数字＝1人あたりの釣果（各船宿の竿頭〜スソの中間を船宿ごとに平均し、さらに船宿間で平均）</div>
+    <div class="rows">
+      <div class="row is-hot">
+        <div class="f-name">マダイ<span class="badge hot">行くべき</span></div>
+        <div class="f-num"><b>3.6</b><small>匹</small><span class="top">竿頭 23 <span class="size">最大5.3kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="flat">→3%</span></span><span>前年 <span class="pos">↑71%</span></span></div>
+        <div class="f-meta">8軒・12便</div>
+        <div class="note">大ダイ5kg級が複数の船宿で出ている。潮が流れれば数も出る。</div>
+      </div>
+      <div class="row is-hot">
+        <div class="f-name">スジイカ<span class="badge hot">行くべき</span></div>
+        <div class="f-num"><b>204</b><small>匹</small><span class="top">竿頭 420 <span class="size">最大35cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="flat">→1%</span></span><span>前年 <span class="pos">↑297%</span></span></div>
+        <div class="f-meta">1軒・3便</div>
+        <div class="note">連日クーラー満タンで9時に早上がり。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">フグ<span class="badge up">上向き</span></div>
+        <div class="f-num"><b>14</b><small>匹</small><span class="top">竿頭 48 <span class="size">最大45cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="pos">↑114%</span></span><span>前年 <span class="pos">↑45%</span></span></div>
+        <div class="f-meta">2軒・3便</div>
+        <div class="note">不動丸は19〜48匹で、トラフグも混じる。前年比+45%。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">タコ<span class="badge steady">安定</span></div>
+        <div class="f-num"><b>2.5</b><small>匹</small><span class="top">竿頭 9 <span class="size">最大2.5kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="flat">→14%</span></span><span>前年 <span class="flat">→4%</span></span></div>
+        <div class="f-meta">4軒・7便</div>
+        <div class="note">小ぶり中心。</div>
+      </div>
+      <div class="row">
+        <div class="f-name">ワラサ・イナダ</div>
+        <div class="f-num"><b>1.2</b><small>匹</small><span class="top">竿頭 3 <span class="size">最大3.7kg</span></span></div>
+        <div class="f-trend"><span>前週 <span class="neg">↓76%</span></span><span>前年 <span class="neg">↓57%</span></span></div>
+        <div class="f-meta">1軒・2便</div>
+        
+      </div>
+      <div class="row minor">
+        <div class="f-name">マルイカ</div>
+        <div class="f-num"><b>38</b><small>匹</small><span class="top">竿頭 72 <span class="size">最大35cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="pos">↑80%</span></span><span>前年 <span class="pos">↑3750%</span></span></div>
+        <div class="f-meta">1軒・1便・参考値</div>
+        
+      </div>
+      <div class="row minor">
+        <div class="f-name">ベラ</div>
+        <div class="f-num"><b>1</b><small>匹</small><span class="top">竿頭 1 <span class="size">最大15cm</span></span></div>
+        <div class="f-trend"><span>前週 <span class="na">—</span></span><span>前年 <span class="na">—</span></span></div>
+        <div class="f-meta">1軒・1便・参考値</div>
+        
+      </div></div>
+    <details class="sources"><summary>出典の釣船屋（9軒）</summary><ul><li><a href="https://www.chowari.jp/ship/00166/catch/" target="_blank" rel="noopener">不動丸</a><span>8件</span></li><li><a href="https://www.chowari.jp/ship/00164/catch/" target="_blank" rel="noopener">幸栄丸</a><span>8件</span></li><li><a href="https://www.chowari.jp/ship/00167/catch/" target="_blank" rel="noopener">長岡丸</a><span>4件</span></li><li><a href="https://www.chowari.jp/ship/00955/catch/" target="_blank" rel="noopener">利喜丸</a><span>3件</span></li><li><a href="https://www.chowari.jp/ship/00964/catch/" target="_blank" rel="noopener">植田丸</a><span>2件</span></li><li><a href="https://www.chowari.jp/ship/00348/catch/" target="_blank" rel="noopener">清栄丸</a><span>2件</span></li><li><a href="https://www.chowari.jp/ship/00169/catch/" target="_blank" rel="noopener">大春丸</a><span>2件</span></li><li><a href="https://www.chowari.jp/ship/00951/catch/" target="_blank" rel="noopener">宗和丸</a><span>1件</span></li><li><a href="https://www.chowari.jp/ship/00963/catch/" target="_blank" rel="noopener">鬼澤丸</a><span>1件</span></li></ul></details>
+  </section>
+</main>
+<div class="foot" id="dots"><a href="archive/">過去のレポート</a></div>
+<script>
+(function(){
+  var deck=document.getElementById('deck'),slides=[].slice.call(deck.children),dots=document.getElementById('dots');
+  slides.forEach(function(_,i){var d=document.createElement('span');d.className='dot';dots.insertBefore(d,dots.lastChild);});
+  var ds=dots.querySelectorAll('.dot');
+  function upd(){var i=Math.round(deck.scrollLeft/deck.clientWidth);ds.forEach(function(d,j){d.classList.toggle('on',i===j);});}
+  deck.addEventListener('scroll',upd,{passive:true});upd();
+  document.addEventListener('keydown',function(e){if(e.key==='ArrowRight')deck.scrollBy({left:deck.clientWidth});if(e.key==='ArrowLeft')deck.scrollBy({left:-deck.clientWidth});});
+})();
+</script>
+</body>
+</html>

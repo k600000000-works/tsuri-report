@@ -1,0 +1,151 @@
+"""釣割（chowari.jp）から各船宿の釣果を集める。
+
+使い方:
+  python scripts/collect.py                 # 今日を基準に直近14日 + 前年同時期を取得
+  python scripts/collect.py --date 2026-10-16
+
+出力: data/raw/<基準日>.json
+"""
+import argparse
+import datetime as dt
+import html
+import json
+import re
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+BASE = "https://www.chowari.jp"
+UA = {"User-Agent": "Mozilla/5.0 (tsuri-report weekly; personal use)"}
+WAIT = 0.6  # 先方サーバーに負担をかけないための間隔（秒）
+
+ITEM_RE = re.compile(r'<li data-ship="(\d+)" data-choka="(\d+)" class="catch_item.*?(?=<li data-ship=|</ul>\s*<div|\Z)', re.S)
+DATE_RE = re.compile(r'catch_item_date">釣行日：(\d{4})年(\d{1,2})月(\d{1,2})日（.）\s*([^<]*)<')
+FISH_RE = re.compile(r'<tr>\s*<th><h2>(.*?)</h2></th>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*</tr>', re.S)
+COMMENT_RE = re.compile(r'catch_item_comment_txt">(.*?)<span', re.S)
+NUM_RE = re.compile(r'([\d.]+)')
+
+
+def get(url):
+    for i in range(3):
+        try:
+            b = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30).read()
+            try:
+                return b.decode("utf-8")
+            except UnicodeDecodeError:
+                return b.decode("cp932", "replace")
+        except Exception as e:  # noqa: BLE001
+            if i == 2:
+                print(f"  ! 取得失敗 {url}: {e}", file=sys.stderr)
+                return ""
+            time.sleep(3)
+
+
+def clean(s):
+    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", s))).strip()
+
+
+def parse_range(s):
+    """'20～115匹' -> (20, 115, '匹')。数字がなければ None。"""
+    s = clean(s)
+    nums = [float(x) for x in NUM_RE.findall(s.replace(",", ""))]
+    if not nums:
+        return None
+    m = re.search(r"(匹|本|枚|杯|尾|kg|ｋｇ|個)", s)
+    unit = m.group(1) if m else ""
+    return (nums[0], nums[-1], unit)
+
+
+def parse_page(text, ship_id):
+    out = []
+    for m in ITEM_RE.finditer(text):
+        block = m.group(0)
+        d = DATE_RE.search(block)
+        if not d:
+            continue
+        fish = []
+        for f in FISH_RE.finditer(block):
+            cnt = parse_range(f.group(3))
+            size = parse_range(f.group(2))
+            fish.append({
+                "name": clean(f.group(1)),
+                "size": clean(f.group(2)),
+                "count": clean(f.group(3)),
+                "min": cnt[0] if cnt else None,
+                "max": cnt[1] if cnt else None,
+                "unit": cnt[2] if cnt else "",
+                "size_max": size[1] if size else None,
+            })
+        c = COMMENT_RE.search(block)
+        out.append({
+            "ship_id": ship_id,
+            "choka_id": m.group(2),
+            "date": f"{int(d.group(1)):04d}-{int(d.group(2)):02d}-{int(d.group(3)):02d}",
+            "tide": d.group(4).strip(),
+            "fish": fish,
+            "comment": clean(c.group(1)) if c else "",
+        })
+    return out
+
+
+def fetch_ship(ship_id, since, until, dt_param=None, max_pages=8):
+    """since〜until（両端含む）の釣果を新しい順にページを辿って取る。"""
+    res = []
+    for page in range(1, max_pages + 1):
+        q = []
+        if dt_param:
+            q.append(f"dt={dt_param}")
+        if page > 1:
+            q.append(f"page={page}")
+        url = f"{BASE}/ship/{ship_id}/catch/" + ("?" + "&".join(q) if q else "")
+        items = parse_page(get(url), ship_id)
+        time.sleep(WAIT)
+        if not items:
+            break
+        res += [it for it in items if since <= it["date"] <= until]
+        if min(it["date"] for it in items) < since:
+            break
+    return res
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--date", help="基準日 YYYY-MM-DD（省略時は今日）")
+    ap.add_argument("--days", type=int, default=14)
+    ap.add_argument("--no-lastyear", action="store_true")
+    a = ap.parse_args()
+
+    base = dt.date.fromisoformat(a.date) if a.date else dt.date.today()
+    since = (base - dt.timedelta(days=a.days - 1)).isoformat()
+    until = base.isoformat()
+    # 前年同時期: 前年の同じ日付の前後7日
+    ly = base.replace(year=base.year - 1)
+    ly_since = (ly - dt.timedelta(days=7)).isoformat()
+    ly_until = (ly + dt.timedelta(days=7)).isoformat()
+    ly_months = sorted({ly_since[2:7].replace("-", ""), ly_until[2:7].replace("-", "")}, reverse=True)
+
+    cfg = json.loads((ROOT / "config" / "ports.json").read_text(encoding="utf-8"))
+    out = {"base_date": until, "since": since, "lastyear": [ly_since, ly_until], "groups": []}
+    for g in cfg["groups"]:
+        print(f"[{g['name']}] {len(g['ships'])}軒", file=sys.stderr)
+        ships = []
+        for s in g["ships"]:
+            cur = fetch_ship(s["id"], since, until)
+            last = []
+            if not a.no_lastyear and cur:  # 今期に釣果がある船宿だけ前年も見る
+                for ym in ly_months:
+                    last += fetch_ship(s["id"], ly_since, ly_until, dt_param=ym)
+            print(f"  {s['name']}: 今期{len(cur)}件 前年{len(last)}件", file=sys.stderr)
+            ships.append({**s, "url": f"{BASE}/ship/{s['id']}/catch/", "catches": cur, "lastyear": last})
+        out["groups"].append({"name": g["name"], "ships": ships})
+
+    p = ROOT / "data" / "raw" / f"{until}.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"saved {p}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()
