@@ -193,6 +193,8 @@ def main():
             if now_v is None:
                 continue
             reports = sum(len(e["days"]) for e in nowl)
+            recent3 = [v for v in series[:3] if v is not None]
+            avg3 = round(statistics.mean(recent3), 1) if recent3 else None
             rows.append({
                 "fish": k, "avg": now_v, "unit": counter(k, next((e["unit"] for e in nowl if e["unit"]), "")),
                 "top": max(e["top"] for e in nowl),
@@ -202,6 +204,8 @@ def main():
                 "series": list(reversed(series)),  # 古い週→今週
                 "wow": round(now_v / prev_v - 1, 2) if prev_v else None,
                 "yoy": round(now_v / ly_v - 1, 2) if ly_v else None,
+                "avg3": avg3,
+                "yoy3": round(avg3 / ly_v - 1, 2) if (ly_v and avg3) else None,
                 "ships": len(f["ships"]), "reports": reports,
                 "ship_list": sorted(f["ships"], key=lambda x: -(x["avg"] or 0)),
                 "minor": reports < MIN_REPORTS,
@@ -220,7 +224,7 @@ def main():
             ser = " → ".join("—" if v is None else f"{v:g}" for v in r["series"])
             mark = " ※本人が最近釣行済み（picks から外す）" if r["recent_trip"] else ""
             digest.append(f"\n### {r['fish']}  平均{r['avg']}{r['unit']} 竿頭{r['top']:g} / 前週比{pct(r['wow'])} 前年比{pct(r['yoy'])} / {r['ships']}軒 {r['reports']}便{mark}\n")
-            digest.append(f"週ごとの推移（古→新）: {ser}\n")
+            digest.append(f"週ごとの推移（古→新）: {ser} / 直近3週平均 {r['avg3']}（前年比 {pct(r['yoy3'])}）\n")
             digest += [f"- {c}\n" for c in r["comments"]]
 
     out = ROOT / "data" / "summary" / f"{date}.json"

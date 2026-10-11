@@ -21,6 +21,7 @@ STATUS = {  # status -> (ラベル, CSSクラス, 並び順)
     "hot": ("狙い目", "hot", 0),
     "up": ("上向き", "up", 1),
     "steady": ("安定", "steady", 2),
+    "wait": ("海況待ち", "wait", 2),
     "down": ("下降", "down", 3),
     "slow": ("低調", "down", 4),
 }
@@ -336,7 +337,7 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .s-num{font-size:12.5px;color:var(--sub)}.s-num small{font-size:11px}
 .s-go{font-size:18px;color:var(--sub)}
 .badge{font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;color:#fff;letter-spacing:.04em;font-family:"Noto Sans JP",sans-serif}
-.badge.hot{background:var(--buoy)}.badge.up{background:var(--up)}.badge.steady{background:var(--steady)}.badge.down{background:var(--down)}
+.badge.hot{background:var(--buoy)}.badge.up{background:var(--up)}.badge.steady{background:var(--steady)}.badge.down{background:var(--down)}.badge.wait{background:#5b7f99}
 .pos{color:var(--up);font-weight:700}.neg{color:var(--down);font-weight:700}.flat{color:var(--sub)}.na{color:var(--sub)}
 .legend{font-size:11.5px;color:var(--sub);margin:14px 2px}
 .sources{margin-top:6px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px}
