@@ -60,7 +60,7 @@ def window(catches, lo, hi):
 
 def ship_stats(catches):
     """魚種 -> {'vals': [...代表値], 'top': 竿頭最大, 'unit', 'size_max', 'comments': [...]}"""
-    d = defaultdict(lambda: {"vals": [], "top": 0, "unit": "", "size_max": 0, "size_unit": "", "comments": [], "days": set()})
+    d = defaultdict(lambda: {"vals": [], "los": [], "his": [], "top": 0, "unit": "", "size_max": 0, "size_unit": "", "comments": [], "days": set()})
     for c in catches:
         for f in c["fish"]:
             k = norm(f["name"])
@@ -69,6 +69,8 @@ def ship_stats(catches):
             e = d[k]
             if f["min"] is not None:
                 e["vals"].append((f["min"] + f["max"]) / 2)
+                e["los"].append(f["min"])
+                e["his"].append(f["max"])
                 e["top"] = max(e["top"], f["max"])
                 e["unit"] = e["unit"] or f["unit"]
             if f.get("size_max"):
@@ -87,9 +89,10 @@ def ship_week(e):
     return statistics.median(e["vals"]) if e["vals"] else None
 
 
-def group_value(per_ship):
-    """エリアの値。5軒以上なら最高・最低の船宿を1軒ずつ除いて平均する。"""
-    vals = sorted(v for v in (ship_week(e) for e in per_ship) if v is not None)
+def group_value(per_ship, key="vals"):
+    """エリアの値。船宿ごとに週の中央値を取り、5軒以上なら最高・最低の船宿を1軒ずつ除いて平均する。
+    key: "vals"（スソと竿頭の中間）/ "los"（スソ）/ "his"（竿頭）"""
+    vals = sorted(statistics.median(e[key]) for e in per_ship if e[key])
     if len(vals) >= 5:
         vals = vals[1:-1]
     elif len(vals) >= 3:  # 船中合計を1人分の欄に書いたような極端な値を除く
@@ -196,6 +199,8 @@ def main():
                     "name": s["name"], "url": s["url"],
                     "avg": round(ship_week(e), 1) if e["vals"] else None,
                     "top": e["top"] or None, "reports": len(e["days"]),
+                    "lo": statistics.median(e["los"]) if e["los"] else None,
+                    "hi": statistics.median(e["his"]) if e["his"] else None,
                 })
                 fish[k]["comments"] += [f"[{s['name']}] {c}" for c in e["comments"][:4]]
             for k, e in ly.items():
@@ -224,6 +229,8 @@ def main():
                 "wow": round(now_v / prev_v - 1, 2) if prev_v else None,
                 "yoy": round(now_v / ly_v - 1, 2) if ly_v else None,
                 "avg3": avg3,
+                "lo_typ": group_value(nowl, "los"),  # ふつうの日のスソ
+                "hi_typ": group_value(nowl, "his"),  # ふつうの日の竿頭
                 "steady_good": good, "steady_total": total,
                 "yoy3": round(avg3 / ly_v - 1, 2) if (ly_v and avg3) else None,
                 "ships": len(f["ships"]), "reports": reports,

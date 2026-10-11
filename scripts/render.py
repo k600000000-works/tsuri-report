@@ -57,6 +57,21 @@ def num(v):
     return "—" if v is None else (f"{v:g}" if v < 10 else f"{v:.0f}")
 
 
+def cnt(v):
+    """幅の表示用。小さい数は小数1桁、それ以外は整数。"""
+    if v is None:
+        return "—"
+    return f"{v:.1f}".rstrip("0").rstrip(".") if v < 3 else f"{round(v):d}"
+
+
+def rng(lo, hi, unit, big=True):
+    if hi is None:
+        return "—"
+    if big:
+        return f'<span class="lo">{cnt(lo)}〜</span><b>{cnt(hi)}</b><small>{E(unit)}</small>'
+    return f"{cnt(lo)}〜{cnt(hi)}{E(unit)}"
+
+
 def spark(series, hot=False):
     vals = [v for v in series if v is not None]
     if not vals:
@@ -108,7 +123,7 @@ def line_chart(r, weeks, hot=False):
             tags.append(f'<text x="{x(i):.1f}" y="{y(v) - 9:.1f}" class="lc-val" text-anchor="middle">{num(v)}</text>')
     return (f'<figure class="lc"><svg viewBox="0 0 {W} {H}" role="img" aria-label="{E(r["fish"])}の週ごとの推移">{grid}{ref}'
             f'<path d="{path}" class="lc-line"/>{"".join(marks)}{"".join(tags)}{labels}</svg>'
-            f'<figcaption class="lc-cap">週ごとの1人あたり釣果（{unit}）。点をタップすると値を表示</figcaption></figure>')
+            f'<figcaption class="lc-cap">週ごとの目安（1人あたり・{unit}）の推移。点をタップすると値を表示</figcaption></figure>')
 
 
 def chips(n):
@@ -133,7 +148,7 @@ def fish_rows(g, notes, weeks=()):
         size = f'・最大{r["size_max"]:g}{r["size_unit"]}' if r.get("size_max") and r.get("size_unit") else ""
         ships = "".join(
             f'<li><a href="{E(s["url"])}" target="_blank" rel="noopener"><span class="s-name">{E(s["name"])}</span>'
-            f'<span class="s-num">目安 {num(s["avg"])}・竿頭 {num(s["top"])}<small>（{s["reports"]}便）</small></span><span class="s-go">›</span></a></li>'
+            f'<span class="s-num">{rng(s.get("lo"), s.get("hi"), r["unit"], big=False)}・目安 {num(s["avg"])}<small>（{s["reports"]}便）</small></span><span class="s-go">›</span></a></li>'
             for s in r.get("ship_list", []))
         out.append(f"""
       <details class="row{' is-hot' if hot else ''}{' minor' if r['minor'] else ''}">
@@ -143,7 +158,7 @@ def fish_rows(g, notes, weeks=()):
             <div class="r-name">{E(r['fish'])}{badge}</div>
             <div class="r-trend">前週 {pct(r['wow'])}<span class="sep"></span>前年 {pct(r['yoy'])}</div>
           </div>
-          <div class="r-num"><span class="r-lab">1人あたり目安</span><b>{num(r['avg'])}</b><small>{E(r['unit'])}</small><span class="r-top">竿頭 {num(r['top'])}{size}</span></div>
+          <div class="r-num"><span class="r-lab">スソ〜竿頭</span>{rng(r.get('lo_typ'), r.get('hi_typ'), r['unit'])}<span class="r-mid">目安 <b>{num(r['avg'])}</b></span><span class="r-top">週最高 {num(r['top'])}{size}</span></div>
           <div class="r-spark">{spark(r.get('series', []), hot)}<span>{len(r.get('series', []))}週推移</span></div>
           {chips(n)}
           {f'<p class="r-note">{E(n["note"])}</p>' if n.get('note') else ''}
@@ -223,13 +238,14 @@ def build(summary, picks, issue_no=1):
         <div class="mast-double"></div>
         <div class="mast-issue"><span>第{issue_no}号</span><span>{base.year}年{base.month}月{base.day}日（{wk}）</span><span>集計 {period}</span></div>
       </header>
+      <nav class="quick"><a href="#by-fish"><b>魚種別</b><span>好調な港を探す ›</span></a><a href="#areas"><b>エリア別</b><span>港ごとに見る ↓</span></a><a href="#howto"><b>数値の見方</b><span>算出方法 ›</span></a></nav>
       <div class="sec-title">全エリア総評</div>
       <p class="overall">{E(picks.get('headline', '今週の総評はありません。'))}</p>
       <div class="sec-title">今週の狙い目</div>
       <div class="picks">{''.join(cards)}</div>
       {excluded}
       {log}
-      <div class="sec-title">エリア</div>
+      <div class="sec-title" id="areas">エリア</div>
       <div class="map map-overview" data-overview='{E(overview)}'></div>
       <nav class="toc">{toc}</nav>
       <a class="to-fish" href="#by-fish">魚種別に、好調な港を見る <span>›</span></a>
@@ -248,12 +264,12 @@ def build(summary, picks, issue_no=1):
             return f'<span class="badge {STATUS[s][1]}">{STATUS[s][0]}</span>' if s in STATUS else ""
         items = "".join(
             f'<a class="fp{" fp-hot" if s == "hot" else ""}" href="#g-{E(gname)}"><span class="fp-port">{E(gname)}</span>'
-            f'<span class="fp-num">{num(r["avg"])}{E(r["unit"])}</span>{badge(s)}<span class="fp-go">›</span></a>'
+            f'<span class="fp-num">{rng(r.get("lo_typ"), r.get("hi_typ"), r["unit"], big=False)}</span>{badge(s)}<span class="fp-go">›</span></a>'
             for gname, r, s in lst)
         fish_cards.append(f'<div class="fcard"><div class="fcard-head"><div class="r-icon">{icon(fish)}</div><h3>{E(fish)}</h3></div>{items}</div>')
     slides.append(f"""
   <section class="slide page" id="by-fish">
-    <header class="band"><div class="band-in"><a class="back" href="#top">‹ 表紙</a><h2>魚種別</h2><p>魚種ごとに、どの港の調子が良いかを並べています。港名をタップすると、そのエリアのページに移ります。</p></div></header>
+    <header class="band"><div class="band-in"><a class="back" href="#top">‹ TOP</a><h2>魚種別</h2><p>魚種ごとに、どの港の調子が良いかを並べています。港名をタップすると、そのエリアのページに移ります。</p></div></header>
     <div class="wrap"><div class="fcards">{''.join(fish_cards)}</div></div>
   </section>""")
 
@@ -266,13 +282,13 @@ def build(summary, picks, issue_no=1):
         mapdata = json.dumps({"c": geo.get("c"), "z": geo.get("z"), "m": geo.get("m", [])}, ensure_ascii=False)
         slides.append(f"""
   <section class="slide page" id="g-{E(g['name'])}">
-    <header class="band"><div class="band-in"><a class="back" href="#top">‹ 表紙</a><h2>{E(g['name'])}</h2><p>{E(geo.get('sub', ''))}</p></div>
+    <header class="band"><div class="band-in"><a class="back" href="#top">‹ TOP</a><h2>{E(g['name'])}</h2><p>{E(geo.get('sub', ''))}</p></div>
       <div class="map" data-map='{E(mapdata)}'></div></header>
     <div class="wrap">
       {f'<div class="sec-title">概況</div><p class="g-summary">{E(n["summary"])}</p>' if n.get("summary") else ''}
       <div class="sec-title">魚種別の釣果 <small><a href="#howto" class="howto-link">数値の見方 ›</a></small></div>
       <div class="rows">{fish_rows(g, n, weeks_old_first)}</div>
-      <p class="legend"><a href="#howto" class="howto-link">数値の見方・算出方法 ›</a><br>大きな数字は「1人あたり目安」。①便ごとに、スソ（最少）と竿頭（最多）の真ん中を出す（例: 20〜115匹 → 67.5匹）②船宿ごとに、その週の便の中央値を取る ③船宿間で平均する（5軒以上なら最高・最低の1軒ずつを除く）。1日だけの大釣りや不調に左右されにくい値です。「標準以上」は、今週の便のうち、ここ5週の標準を上回った便の数。棒グラフは週ごとの推移（右端が今週）。</p>
+      <p class="legend"><a href="#howto" class="howto-link">数値の見方・算出方法 ›</a><br>大きな数字は「ふつうの日の竿頭」、左の小さな数字は「ふつうの日のスソ」（船宿ごとの週の中央値を船宿間で平均）。「目安」はスソと竿頭の真ん中から出した1人あたりの目安。1日だけの大釣りや不調に左右されにくい値です。「標準以上」は、今週の便のうち、ここ5週の標準を上回った便の数。棒グラフは週ごとの推移（右端が今週）。</p>
       <details class="sources"><summary>出典の釣船屋（{len(g['sources'])}軒）</summary><ul class="ships">{src or '<li>なし</li>'}</ul></details>
     </div>
   </section>""")
@@ -284,9 +300,16 @@ def build(summary, picks, issue_no=1):
 
 HOWTO = """
   <section class="slide page" id="howto">
-    <header class="band"><div class="band-in"><a class="back" href="#top">‹ 表紙</a><h2>数値の見方</h2><p>このレポートの数字の出し方と、表示の意味です。</p></div></header>
+    <header class="band"><div class="band-in"><a class="back" href="#top">‹ TOP</a><h2>数値の見方</h2><p>このレポートの数字の出し方と、表示の意味です。</p></div></header>
     <div class="wrap howto">
-      <div class="sec-title">1人あたり目安</div>
+      <div class="sec-title">スソ〜竿頭（大きな数字）</div>
+      <p>各魚種の大きな数字は「<b>ふつうの日の竿頭</b>」、その左の小さな数字は「<b>ふつうの日のスソ</b>」です。船宿が公表する「○〜○匹」の書き方に合わせています。</p>
+      <ol>
+        <li>船宿ごとに、その週の便の竿頭（最多）とスソ（最少）それぞれの<b>中央値</b>を取ります。</li>
+        <li>それを船宿間で平均します（5軒以上なら最も高い船宿・低い船宿を1軒ずつ除く）。</li>
+      </ol>
+      <p>1日だけの大釣りに引っ張られないよう中央値を使っているので、その週にいちばん多く釣れた数は「週最高」として別に小さく表示しています。</p>
+      <div class="sec-title">目安（1人あたり）</div>
       <p>エリアごと・魚種ごとの大きな数字です。その週、そのエリアで「ふつうの日に、ふつうの人が釣れた数」の目安を表します。次の3段階で出しています。</p>
       <ol>
         <li><b>便ごとの値</b>：船宿が公表する「スソ（最少）〜竿頭（最多）」の真ん中を取ります。<br><span class="eg">例: 20〜115匹 → (20＋115)÷2 ＝ 67.5匹</span></li>
@@ -297,7 +320,7 @@ HOWTO = """
 
       <div class="sec-title">そのほかの表示</div>
       <dl>
-        <dt>竿頭</dt><dd>その週にエリア内で報告された最多の数（参考値）。判定には使っていません。</dd>
+        <dt>週最高</dt><dd>その週にエリア内で報告された最多の数（参考値）。判定には使っていません。</dd>
         <dt>前週</dt><dd>1人あたり目安の、前の週との比較。</dd>
         <dt>前年</dt><dd>前年の同じ時期（前後1週間）の1人あたり目安との比較。</dd>
         <dt>標準以上 ○/○便</dt><dd>今週の便のうち、その魚のここ5週の標準（便ごとの値の中央値）を上回った便の数。多いほど、日によるムラが少なく安定しています。</dd>
@@ -403,6 +426,10 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .toc a b{font-size:15px}.toc a span{font-size:12px;color:#9fc0d4}
 .to-fish{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:14px 16px;border-radius:12px;background:#eef4f8;color:var(--navy);font-weight:700;text-decoration:none}
 .to-fish span{font-size:22px;line-height:1}
+.quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0 4px}
+.quick a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px;border-radius:12px;text-decoration:none;
+  background:rgba(255,255,255,.08);border:1px solid rgba(233,213,168,.35)}
+.quick b{font-size:14px;color:#f6ecd6}.quick span{font-size:10.5px;color:#9fc0d4}
 .to-howto{display:block;text-align:center;margin-top:12px;font-size:13px;color:#8fc3e3}
 .howto-link{color:var(--sea);font-weight:700;text-decoration:none}
 .howto p,.howto li,.howto dd{font-size:14.5px;line-height:1.8}
@@ -443,6 +470,8 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .r-num{text-align:right;grid-row:span 2;align-self:center}
 .r-num b{font-size:24px;font-family:"Noto Serif JP",serif}.r-num small{font-size:12px;margin-left:1px}
 .r-lab{display:block;font-size:10px;color:var(--sub);line-height:1.2}
+.r-num .lo{font-size:13px;color:var(--sub);font-family:"Noto Serif JP",serif}
+.r-mid{display:block;font-size:12px;color:var(--ink);line-height:1.3}.r-mid b{font-size:15px;font-family:"Noto Serif JP",serif}
 .r-top{display:block;font-size:11px;color:var(--sub);white-space:nowrap}
 .r-spark{grid-column:1/-1;display:flex;align-items:flex-end;gap:8px;margin-top:6px}
 .r-spark span{font-size:11px;color:var(--sub)}
@@ -510,7 +539,7 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
   document.addEventListener('keydown',function(e){if(e.key==='ArrowRight')deck.scrollBy({left:deck.clientWidth});if(e.key==='ArrowLeft')deck.scrollBy({left:-deck.clientWidth});});
   // ページ内リンク: 横スクロールで移動して縦位置を先頭へ
   document.addEventListener('click',function(e){var a=e.target.closest('a[href^="#"]');if(!a)return;var t=document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1)));if(!t)return;
-    e.preventDefault();t.scrollTop=0;deck.scrollTo({left:t.offsetLeft});history.replaceState(null,'',a.getAttribute('href'));});
+    e.preventDefault();if(!t.classList.contains('slide')){var sl=t.closest('.slide');sl.scrollTo({top:t.offsetTop-12,behavior:'smooth'});return;}t.scrollTop=0;deck.scrollTo({left:t.offsetLeft});history.replaceState(null,'',a.getAttribute('href'));});
   if(location.hash){var t=document.getElementById(decodeURIComponent(location.hash.slice(1)));if(t){deck.style.scrollBehavior='auto';deck.scrollLeft=t.offsetLeft;deck.style.scrollBehavior='';}}
 
   document.addEventListener('click',function(e){var c=e.target.closest('[data-cap]');if(!c)return;
