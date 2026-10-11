@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MIN_REPORTS = 2  # 週の報告数がこれ未満の魚種は「参考」扱い
 WEEKS = 5        # 推移を見る週数
-RECENT_DAYS = 28 # 「最近行った」とみなす日数
+RECENT_DAYS = 60 # 「最近行った」とみなす日数（約2か月）
 
 # 表記ゆれの統一
 ALIASES = {
@@ -174,7 +174,7 @@ def main():
     digest = [f"# 判定用ダイジェスト {raw['base_date']}（今週 {weeks[0][0]}〜 / 推移は古い週→今週 / 前年 {ly_lo}〜{ly_hi}）\n"]
     fmt = lambda t: f"{t['when']}・{t['where']}で{t['fish']}" + (f"（{t['self']}）" if t["self"] else "")
     digest.append("\n## 本人の釣行（ぼかし済み。公開物に書くときもこの粒度まで。日付・船宿名・同行者は書かない）\n")
-    digest.append("- 4週間以内に行った魚種（狙い目 picks から外し、外したことを excluded に書く）: "
+    digest.append("- 2か月以内に行った魚種（狙い目 picks から外し、外したことを excluded に書く）: "
                   + ("、".join(trips) or "なし") + "\n")
     digest.append("- 過去の同じ時期の釣行: " + ("、".join(fmt(t) for t in season) or "なし") + "\n")
     digest.append("- 魚種ごとの直近の釣行: " + "、".join(fmt(t) for t in last.values()) + "\n")

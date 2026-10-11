@@ -72,6 +72,43 @@ def spark(series, hot=False):
             f'aria-label="直近{len(series)}週の推移">{"".join(bars)}</svg>')
 
 
+def line_chart(r, weeks, hot=False):
+    """タップで開く折れ線グラフ（週ごとの値・前年同期の水準）。weeks は古い週→今週の (開始日, 終了日)。"""
+    series = r.get("series", [])
+    pts = [(i, v) for i, v in enumerate(series) if v is not None]
+    if len(pts) < 2:
+        return ""
+    W, H, L, R, T, B = 320, 150, 34, 58, 16, 26
+    ly = r.get("lastyear")
+    top = max([v for _, v in pts] + ([ly] if ly else [])) * 1.18 or 1
+    x = lambda i: L + (W - L - R) * i / max(len(series) - 1, 1)
+    y = lambda v: T + (H - T - B) * (1 - v / top)
+    grid = "".join(f'<line x1="{L}" x2="{W - R}" y1="{y(top * k):.1f}" y2="{y(top * k):.1f}" class="lc-grid"/>'
+                   f'<text x="{L - 6}" y="{y(top * k) + 3.5:.1f}" class="lc-ax" text-anchor="end">{num(top * k)}</text>'
+                   for k in (0, 0.5, 1))
+    labels = "".join(f'<text x="{x(i):.1f}" y="{H - 8}" class="lc-ax" text-anchor="middle">{dt.date.fromisoformat(w[0]).month}/{dt.date.fromisoformat(w[0]).day}〜</text>'
+                     for i, w in enumerate(weeks))
+    ref = ""
+    if ly:
+        ref = (f'<line x1="{L}" x2="{W - R}" y1="{y(ly):.1f}" y2="{y(ly):.1f}" class="lc-ref"/>'
+               f'<text x="{W - R + 6}" y="{y(ly) + (14 if abs(y(ly) - y(series[-1] or 0)) < 12 else 3.5):.1f}" class="lc-reflab">前年同期 {num(ly)}</text>')
+    path = "M" + " L".join(f"{x(i):.1f},{y(v):.1f}" for i, v in pts)
+    imax = max(pts, key=lambda p: p[1])[0]
+    marks, tags = [], []
+    unit = E(r.get("unit", ""))
+    for i, v in pts:
+        last = i == len(series) - 1
+        w0 = dt.date.fromisoformat(weeks[i][0])
+        cap = f"{w0.month}/{w0.day}からの週: {num(v)}{unit}"
+        marks.append(f'<circle cx="{x(i):.1f}" cy="{y(v):.1f}" r="{5 if last else 4}" class="lc-pt{" lc-now" if last else ""}{" lc-hot" if last and hot else ""}" data-cap="{E(cap)}"/>'
+                     f'<circle cx="{x(i):.1f}" cy="{y(v):.1f}" r="14" class="lc-hit" data-cap="{E(cap)}"/>')
+        if last or i == imax:
+            tags.append(f'<text x="{x(i):.1f}" y="{y(v) - 9:.1f}" class="lc-val" text-anchor="middle">{num(v)}</text>')
+    return (f'<figure class="lc"><svg viewBox="0 0 {W} {H}" role="img" aria-label="{E(r["fish"])}の週ごとの推移">{grid}{ref}'
+            f'<path d="{path}" class="lc-line"/>{"".join(marks)}{"".join(tags)}{labels}</svg>'
+            f'<figcaption class="lc-cap">週ごとの1人あたり釣果（{unit}）。点をタップすると値を表示</figcaption></figure>')
+
+
 def chips(n):
     out = []
     if n.get("since"):
@@ -82,7 +119,7 @@ def chips(n):
     return f'<div class="chips">{"".join(out)}</div>' if out else ""
 
 
-def fish_rows(g, notes):
+def fish_rows(g, notes, weeks=()):
     fn = notes.get("fish", {})
     rows = sorted(g["fish"], key=lambda r: (r["minor"], STATUS.get(fn.get(r["fish"], {}).get("status"), ("", "", 2))[2], -r["reports"]))
     out = []
@@ -110,6 +147,7 @@ def fish_rows(g, notes):
           {f'<p class="r-note">{E(n["note"])}</p>' if n.get('note') else ''}
           <div class="r-more">{r['ships']}軒・{r['reports']}便{f"・標準以上 {r['steady_good']}/{r['steady_total']}便" if r.get('steady_good') is not None else ''}{'・参考値' if r['minor'] else ''}<span>船宿別の釣果 ▾</span></div>
         </summary>
+        {line_chart(r, weeks, hot)}
         <ul class="ships">{ships}</ul>
       </details>""")
     return "".join(out) or '<p class="empty">今週は釣果の報告がありませんでした。</p>'
@@ -137,6 +175,7 @@ def build(summary, picks):
     notes = picks.get("notes", {})
     w0, w1 = (dt.date.fromisoformat(x) for x in summary["week"])
     period = f"{w0.month}/{w0.day}〜{w1.month}/{w1.day}"
+    weeks_old_first = list(reversed(summary.get("weeks", [])))
     slides = []
 
     # ---- 表紙 ----
@@ -219,7 +258,7 @@ def build(summary, picks):
     <div class="wrap">
       {f'<div class="sec-title">概況</div><p class="g-summary">{E(n["summary"])}</p>' if n.get("summary") else ''}
       <div class="sec-title">魚種別の釣果 <small>タップで船宿ごとの釣果へ</small></div>
-      <div class="rows">{fish_rows(g, n)}</div>
+      <div class="rows">{fish_rows(g, n, weeks_old_first)}</div>
       <p class="legend">数値は1人あたりの釣果の目安です。便ごとに「竿頭とスソの中間」を出し、船宿ごとに週の中央値を取って、船宿間で平均しています（5軒以上なら最高・最低の1軒ずつを除く）。1日だけの大釣りや不調に左右されにくい値です。「標準以上」は、今週の便のうち、ここ5週の標準を上回った便の数。棒グラフは週ごとの推移（右端が今週）。</p>
       <details class="sources"><summary>出典の釣船屋（{len(g['sources'])}軒）</summary><ul class="ships">{src or '<li>なし</li>'}</ul></details>
     </div>
@@ -331,6 +370,19 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .r-more{grid-column:1/-1;display:flex;justify-content:space-between;font-size:11.5px;color:var(--sub);border-top:1px dashed var(--line);margin-top:8px;padding-top:7px}
 .r-more span{color:var(--sea);font-weight:700}
 .row[open] .r-more span{visibility:hidden}
+.lc{margin:4px 14px 6px;padding:10px 4px 2px;border-top:1px solid var(--line)}
+.lc svg{width:100%;height:auto;display:block;overflow:visible}
+.lc-grid{stroke:var(--line);stroke-width:1}
+.lc-ax{font-size:10px;fill:var(--sub)}
+.lc-ref{stroke:var(--down);stroke-width:1.5;stroke-dasharray:4 4}
+.lc-reflab{font-size:10px;fill:var(--sub)}
+.lc-line{fill:none;stroke:var(--sea);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.lc-pt{fill:var(--sea);stroke:var(--card);stroke-width:2}
+.lc-now{fill:var(--sea)}.lc-hot{fill:var(--buoy)}
+.lc-hit{fill:transparent;cursor:pointer}
+.lc-val{font-size:11px;font-weight:700;fill:var(--ink)}
+.lc-cap{font-size:11.5px;color:var(--sub);text-align:center;margin-top:2px;min-height:1.5em}
+.row.is-hot .lc-pt{stroke:var(--buoy-bg)}
 .ships{list-style:none;margin:0;padding:0 8px 8px}
 .ships li a{display:flex;align-items:center;gap:8px;padding:10px 8px;border-top:1px solid var(--line);text-decoration:none}
 .s-name{font-weight:700;color:var(--sea);flex:1}
@@ -376,6 +428,10 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
     e.preventDefault();t.scrollTop=0;deck.scrollTo({left:t.offsetLeft});history.replaceState(null,'',a.getAttribute('href'));});
   if(location.hash){var t=document.getElementById(decodeURIComponent(location.hash.slice(1)));if(t){deck.style.scrollBehavior='auto';deck.scrollLeft=t.offsetLeft;deck.style.scrollBehavior='';}}
 
+  document.addEventListener('click',function(e){var c=e.target.closest('[data-cap]');if(!c)return;
+    var f=c.closest('.lc');f.querySelector('.lc-cap').textContent=c.dataset.cap;
+    f.querySelectorAll('.lc-pt').forEach(function(p){p.setAttribute('r',p.classList.contains('lc-now')?5:4);});
+    var p=c.classList.contains('lc-pt')?c:c.previousElementSibling;if(p)p.setAttribute('r',6.5);});
   if(!window.L)return;
   var tiles='https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png',
       attr='<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院</a>';
