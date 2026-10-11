@@ -7,6 +7,7 @@
 出力: data/raw/<基準日>.json
 """
 import argparse
+import urllib.parse
 import datetime as dt
 import html
 import json
@@ -170,6 +171,113 @@ def fetch_blog(base, ship_id, since, until):
     return res
 
 
+# ---- 陸っぱり・施設 ----
+YFP_API = "https://iqqdsybr6beovaix6btxwykuha.appsync-api.ap-northeast-1.amazonaws.com/graphql"
+YFP_KEY = "da2-of4bzmdi4vhjha5buiog37mki4"  # 横浜フィッシングピアーズの公式サイトが閲覧用に公開しているキー
+YFP_NAMES = {"daikoku": "大黒", "isogo": "磯子", "honmoku": "本牧"}
+
+
+def fetch_yfp(fac, since, until):
+    """横浜の海づり施設（大黒・磯子・本牧）の日ごとの最終釣果。"""
+    q = (ROOT / "config" / "yfp_query.graphql").read_text(encoding="utf-8")
+    out, token = [], None
+    while True:
+        v = {"facility": fac, "date": {"between": [since.replace("-", "/"), until.replace("-", "/")]},
+             "sortDirection": "DESC", "limit": 50}
+        if token:
+            v["nextToken"] = token
+        req = urllib.request.Request(YFP_API, data=json.dumps({"query": q, "variables": v}).encode(),
+                                     headers={"Content-Type": "application/json", "x-api-key": YFP_KEY,
+                                              "Origin": "https://yokohama-fishingpiers.jp", **UA})
+        try:
+            r = json.loads(urllib.request.urlopen(req, timeout=30).read())["data"]["lastPostsByFacilityAndDate"]
+        except Exception as e:  # noqa: BLE001
+            print(f"  ! 取得失敗 {fac}: {e}", file=sys.stderr)
+            break
+        for it in r["items"]:
+            fish = []
+            for n in range(1, 31):
+                name = it.get(f"fish{n}Name")
+                if not name:
+                    continue
+                fish.append({"name": name, "count": it.get(f"fish{n}Count"), "unit": it.get(f"fish{n}Unit") or "",
+                             "size_min": it.get(f"fish{n}MinSize"), "size_max": it.get(f"fish{n}MaxSize"),
+                             "place": it.get(f"fish{n}Place") or []})
+            out.append({"date": it["date"].replace("/", "-"), "facility": YFP_NAMES.get(fac, fac),
+                        "visitors": it.get("visitors"), "water": it.get("waterTemp"), "fish": fish,
+                        "comment": clean(it.get("sentence") or "")[:400]})
+        token = r.get("nextToken")
+        if not token:
+            break
+        time.sleep(WAIT)
+    return out
+
+
+def fetch_uosoku(place, since, until, max_pages=8):
+    """ウオスク（釣果まとめ）の釣り場検索。日付・魚種・釣り方・情報元・リンク。"""
+    out = []
+    for page in range(1, max_pages + 1):
+        t = get(f"https://plus.uosoku.com/search?lo={urllib.parse.quote(place)}&page={page}")
+        time.sleep(WAIT)
+        blocks = re.split(r"<div class='srb'", t)[1:]
+        if not blocks:
+            break
+        oldest = None
+        for b in blocks:
+            d = re.search(r"<span class='c_el'[^>]*>(\d{4}-\d{2}-\d{2})</span>", b)
+            if not d:
+                continue
+            d = d.group(1)
+            oldest = d if (oldest is None or d < oldest) else oldest
+            if not (since <= d <= until):
+                continue
+            pts = re.search(r"関連ポイント[:：](.*?)</span>", b, re.S)
+            if not pts or place not in clean(pts.group(1)):  # 検索結果に混じる別の釣り場を除く
+                continue
+            link = re.search(r"(?:data-href|href)='(https?://[^']+)'[^>]*>([^<]+)</a>", b)
+            fish = re.search(r"関連魚種[:：]\s*([^<]*)</span>", b)
+            how = re.search(r"釣り方[:：]\s*([^<]*)</span>", b)
+            src = re.search(r"情報元[:：]\s*([^<]*)</span>", b)
+            out.append({"date": d, "title": clean(link.group(2)) if link else "", "url": html.unescape(link.group(1)) if link else "",
+                        "source": clean(src.group(1)) if src else "",
+                        "fish": [{"name": f} for f in (fish.group(1).split() if fish else [])],
+                        "method": clean(how.group(1)) if how else ""})
+        if oldest and oldest < since:
+            break
+    return out
+
+
+UMC_BASE = "http://xn--nbk4em1stb5747d2j8b.com"  # 海釣りセンター.com（九十九里海釣りセンター）
+UMC_FISH = ["マダイ", "シマアジ", "ショゴ", "ワカシ", "イナダ", "ワラサ", "ブリ", "カンパチ", "ヒラマサ", "ヒラメ", "カレイ", "イシガレイ",
+            "イシダイ", "イシガキダイ", "ニザダイ", "クロダイ", "メジナ", "イサキ", "アジ", "サバ", "ソイ", "クロソイ", "アイナメ", "カサゴ",
+            "ウマヅラ", "カワハギ", "スズキ", "サーモン", "ギンザケ", "トラウト", "イセエビ", "伊勢海老", "ハタ", "マハタ", "キジハタ", "カマス", "イワシ"]
+
+
+def fetch_umc(since, until):
+    """九十九里海釣りセンターの日ごとの釣果記事（魚種と天気・水温・コメント。匹数は無い）。"""
+    lst = get(f"{UMC_BASE}/choca/")
+    links = sorted(set(re.findall(r'href="(http://xn--nbk4em1stb5747d2j8b\.com/choca/(\d{4})/(\d{2})/(\d{2})/\d+/)"', lst)))
+    out = []
+    for href, y, m, d in links:
+        day = f"{y}-{m}-{d}"
+        if not (since <= day <= until):
+            continue
+        t = clean(re.sub(r"<br\s*/?>", " ", get(href)))
+        time.sleep(WAIT)
+        body = t.split("の釣果", 2)[-1]
+        body = body.split("この釣果・ブログが良かったと思ったら")[0]
+        names, rest = [], body
+        for f in sorted(UMC_FISH, key=len, reverse=True):  # 長い名前から先に取る（シマアジの中のアジを拾わない）
+            if f in rest:
+                names.append("イセエビ" if f == "伊勢海老" else f)
+                rest = rest.replace(f, "　")
+        names.sort(key=lambda n: body.find(n) if n in body else 999)
+        water = re.search(r"水温\s*([\d.]+)", body)
+        out.append({"date": day, "url": href, "fish": [{"name": n} for n in dict.fromkeys(names)],
+                    "water": float(water.group(1)) if water else None, "comment": body[:400].strip()})
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", help="基準日 YYYY-MM-DD（省略時は今日）")
@@ -195,6 +303,19 @@ def main():
             for s in g["ships"]:
                 have[s["id"]] = s
     out = {"base_date": until, "since": since, "lastyear": [ly_since, ly_until], "groups": []}
+    for f in cfg.get("facilities", []):
+        print(f"[施設] {f['name']}", file=sys.stderr)
+        if f["source"] == "yfp":
+            items = [x for fac in f["codes"] for x in fetch_yfp(fac, since, until)]
+            last = [x for fac in f["codes"] for x in fetch_yfp(fac, ly_since, ly_until)] if not a.no_lastyear else []
+        elif f["source"] == "uosoku":
+            items, last = fetch_uosoku(f["place"], since, until), []
+        elif f["source"] == "umc":
+            items, last = fetch_umc(since, until), []
+        else:
+            continue
+        print(f"  今期{len(items)}件 前年{len(last)}件", file=sys.stderr)
+        out.setdefault("facilities", []).append({**f, "items": items, "lastyear": last})
     for g in cfg["groups"]:
         print(f"[{g['name']}] {len(g['ships'])}軒", file=sys.stderr)
         ships = []

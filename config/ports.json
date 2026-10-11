@@ -549,6 +549,51 @@
    ]
   },
   {
+   "name": "館山",
+   "ships": [
+    {
+     "id": "01418",
+     "name": "赤沼丸",
+     "port": "洲崎栄ノ浦港"
+    },
+    {
+     "id": "00293",
+     "name": "早川丸",
+     "port": "洲崎栄ノ浦港"
+    },
+    {
+     "id": "00989",
+     "name": "第2美吉丸",
+     "port": "洲崎漁港"
+    },
+    {
+     "id": "01256",
+     "name": "佐衛美丸",
+     "port": "洲崎漁港"
+    },
+    {
+     "id": "00983",
+     "name": "九左衛門丸",
+     "port": "伊戸漁港"
+    },
+    {
+     "id": "00979",
+     "name": "保坂丸",
+     "port": "伊戸漁港"
+    },
+    {
+     "id": "01047",
+     "name": "安田丸",
+     "port": "相浜港"
+    },
+    {
+     "id": "01013",
+     "name": "良栄丸",
+     "port": "相浜港"
+    }
+   ]
+  },
+  {
    "name": "葉山あぶずり",
    "ships": [
     {
@@ -857,6 +902,35 @@
      "port": "鹿嶋旧港"
     }
    ]
+  }
+ ],
+ "facilities": [
+  {
+   "name": "横浜の海釣り施設",
+   "kind": "count",
+   "source": "yfp",
+   "codes": [
+    "daikoku",
+    "isogo",
+    "honmoku"
+   ],
+   "sub": "大黒・磯子・本牧",
+   "url": "https://yokohama-fishingpiers.jp/"
+  },
+  {
+   "name": "東扇島西公園",
+   "kind": "days",
+   "source": "uosoku",
+   "place": "東扇島西公園",
+   "sub": "川崎市・東扇島",
+   "url": "https://uosoku.com/home/kanto/kanagawa/yokohama/oogi/"
+  },
+  {
+   "name": "九十九里海釣りセンター",
+   "kind": "days",
+   "source": "umc",
+   "sub": "九十九里町（陸上釣り堀）",
+   "url": "http://xn--nbk4em1stb5747d2j8b.com/choca/"
   }
  ]
 }

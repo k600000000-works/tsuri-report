@@ -40,6 +40,8 @@ GEO = {
              "m": [["新安浦", 35.283, 139.665], ["大津", 35.262, 139.705], ["鴨居", 35.245, 139.745], ["久里浜", 35.226, 139.713], ["金田", 35.170, 139.685], ["松輪・剣崎", 35.143, 139.676]]},
     "内房": {"sub": "富津・上総湊・竹岡・金谷", "c": [35.235, 139.84], "z": 10,
            "m": [["富津", 35.302, 139.818], ["上総湊", 35.230, 139.846], ["竹岡", 35.200, 139.832], ["金谷", 35.165, 139.825]]},
+    "館山": {"sub": "船形・館山・洲崎・川名・伊戸・相浜・布良", "c": [34.96, 139.80], "z": 10,
+           "m": [["船形", 35.030, 139.835], ["館山", 34.990, 139.855], ["洲崎", 34.975, 139.760], ["伊戸", 34.945, 139.785], ["相浜・布良", 34.915, 139.840]]},
     "葉山あぶずり": {"sub": "葉山鐙摺港", "c": [35.272, 139.578], "z": 13,
                "m": [["鐙摺港", 35.2735, 139.5775]]},
     "相模湾東側": {"sub": "長井・佐島・芦名・秋谷・葉山芝崎・小坪", "c": [35.245, 139.60], "z": 10,
@@ -48,6 +50,13 @@ GEO = {
                "m": [["那珂湊", 36.337, 140.598], ["大洗", 36.307, 140.574]]},
     "鹿島": {"sub": "鹿嶋旧港・鹿嶋新港・深芝", "c": [35.925, 140.70], "z": 11,
            "m": [["鹿島港", 35.928, 140.697]]},
+}
+
+
+FGEO = {
+    "横浜の海釣り施設": {"c": [35.43, 139.66], "z": 11, "m": [["大黒", 35.462, 139.683], ["本牧", 35.416, 139.678], ["磯子", 35.397, 139.633]]},
+    "東扇島西公園": {"c": [35.495, 139.748], "z": 13, "m": [["東扇島西公園", 35.4955, 139.7475]]},
+    "九十九里海釣りセンター": {"c": [35.537, 140.447], "z": 12, "m": [["九十九里海釣りセンター", 35.5375, 140.4465]]},
 }
 
 
@@ -176,6 +185,52 @@ def fish_rows(g, notes, weeks=()):
     return "".join(out) or '<p class="empty">今週は釣果の報告がありませんでした。</p>'
 
 
+def facility_rows(fa, notes, weeks=()):
+    fn = notes.get("fish", {})
+    rows = sorted(fa["fish"], key=lambda r: (r["minor"], STATUS.get(fn.get(r["fish"], {}).get("status"), ("", "", 2))[2]))
+    out = []
+    for r in rows:
+        if r["minor"] and fa["kind"] != "count":
+            continue
+        n = fn.get(r["fish"], {})
+        st = STATUS.get(n.get("status", ""))
+        hot = n.get("status") == "hot"
+        badge = f'<span class="badge {st[1]}">{st[0]}</span>' if st else ""
+        if fa["kind"] == "count":
+            size = f'{cnt(r["size_min"])}〜{cnt(r["size_max"])}{E(r["size_unit"])}' if r.get("size_max") else ""
+            num_html = (f'<span class="r-lab">来場者100人あたり</span><b>{num(r["per100"])}</b><small>匹</small>'
+                        f'<span class="r-mid">週計 <b>{r["total"]:,}</b>匹</span><span class="r-top">{size}</span>')
+            trend = f'前週 {pct(r.get("wow"))}<span class="sep"></span>前年 {pct(r.get("yoy"))}'
+            sp = spark(r.get("series", []), hot)
+            chart = line_chart({**r, "avg": r["per100"], "unit": "匹/100人"}, weeks, hot)
+            detail = "".join(f'<li><span class="s-name s-plain">{E(k)}</span><span class="s-num">{v:,}匹</span></li>' for k, v in r.get("by_facility", {}).items())
+            meta = f'{r["days"]}日で釣果{"・参考値" if r["minor"] else ""}'
+        else:
+            num_html = f'<span class="r-lab">今週あがった日</span><b>{r["days"]}</b><small>/{r["report_days"]}日</small>'
+            trend = "週ごとの日数の推移"
+            sp = spark(r.get("days_series", []), hot)
+            chart = ""
+            detail = "".join(f'<li><a href="{E(x["url"])}" target="_blank" rel="noopener"><span class="s-name">{E(x["title"][:28])}</span>'
+                             f'<span class="s-num">{x["date"][5:].replace("-", "/")}{("・" + E(x["source"][:12])) if x.get("source") else ""}</span><span class="s-go">›</span></a></li>'
+                             for x in r.get("posts", []))
+            meta = f'{r["days"]}日で報告'
+        out.append(f"""
+      <details class="row{' is-hot' if hot else ''}{' minor' if r['minor'] else ''}" id="f-{E(fa['name'])}-{E(r['fish'])}">
+        <summary>
+          <div class="r-icon">{icon(r['fish'])}</div>
+          <div class="r-main"><div class="r-name">{E(r['fish'])}{badge}</div><div class="r-trend">{trend}</div></div>
+          <div class="r-num">{num_html}</div>
+          <div class="r-spark">{sp}<span>{len(r.get('series') or r.get('days_series') or [])}週推移</span></div>
+          {chips(n)}
+          {f'<p class="r-note">{E(n["note"])}</p>' if n.get('note') else ''}
+          <div class="r-more">{meta}<span>{'施設ごとの内訳' if fa['kind'] == 'count' else '元の釣果・投稿'} ▾</span></div>
+        </summary>
+        {chart}
+        <ul class="ships">{detail or '<li class="s-plain">—</li>'}</ul>
+      </details>""")
+    return "".join(out) or '<p class="empty">今週は釣果の報告がありませんでした。</p>'
+
+
 def by_fish(summary, notes):
     """魚種 -> [(港, row, status)]。参考値は除く。"""
     d = {}
@@ -233,6 +288,7 @@ def build(summary, picks, issue_no=1):
     lg = picks.get("log", [])
     log = ('<div class="sec-title">釣行メモ</div><ul class="log">'
            + "".join(f'<li>{E(x)}</li>' for x in lg) + "</ul>") if lg else ""
+    toc_shore = "".join(f'<a href="#g-{E(fa["name"])}"><b>{E(fa["name"])}</b><span>{E(fa["sub"])} ›</span></a>' for fa in summary.get("facilities", []))
     overview = json.dumps([[g["name"], *GEO[g["name"]]["c"]] for g in summary["groups"] if g["name"] in GEO], ensure_ascii=False)
     slides.append(f"""
   <section class="slide cover" id="top">
@@ -254,6 +310,8 @@ def build(summary, picks, issue_no=1):
       <div class="sec-title" id="areas">エリア</div>
       <div class="map map-overview" data-overview='{E(overview)}'></div>
       <nav class="toc">{toc}</nav>
+      <div class="sec-title">陸っぱり・施設</div>
+      <nav class="toc toc-shore">{toc_shore}</nav>
       <a class="to-fish" href="#by-fish">魚種別に、好調な港を見る <span>›</span></a>
       <a class="to-howto" href="#howto">数値の見方・算出方法 ›</a>
       <p class="hint">横にスワイプすると、魚種別・エリア別のページに進みます</p>
@@ -299,6 +357,26 @@ def build(summary, picks, issue_no=1):
     </div>
   </section>""")
 
+    for fa in summary.get("facilities", []):
+        n = notes.get(fa["name"], {})
+        geo = FGEO.get(fa["name"], {})
+        mapdata = json.dumps({"c": geo.get("c"), "z": geo.get("z"), "m": geo.get("m", [])}, ensure_ascii=False)
+        legend = ("大きな数字は、施設が公表する魚種ごとの釣れた数（施設全体の合計）を、その週の来場者数で割って100人あたりにしたもの。混む週末も空いた平日も同じ物差しで比べられます。"
+                  if fa["kind"] == "count" else
+                  "この釣り場は数の公表がないため、その魚が報告された日数（今週の報告日のうち何日か）で調子を表しています。状態はコメントや投稿の内容も合わせて判断しています。")
+        slides.append(f"""
+  <section class="slide page" id="g-{E(fa['name'])}">
+    <header class="band band-shore"><div class="band-in"><div class="navrow"><a class="back js-back" href="#top">‹ 戻る</a><a class="back" href="#top">TOP</a></div>
+      <div class="kind">陸っぱり・施設</div><h2>{E(fa['name'])}</h2><p>{E(fa['sub'])}{f"・今週の来場者 {fa['visitors']:,}人" if fa.get('visitors') else ''}</p></div>
+      <div class="map" data-map='{E(mapdata)}'></div></header>
+    <div class="wrap">
+      {f'<div class="sec-title">概況</div><p class="g-summary">{E(n["summary"])}</p>' if n.get("summary") else ''}
+      <div class="sec-title">魚種別の釣果 <small><a href="#howto" class="howto-link">数値の見方 ›</a></small></div>
+      <div class="rows">{facility_rows(fa, n, weeks_old_first)}</div>
+      <p class="legend">{legend}</p>
+      <details class="sources"><summary>出典</summary><ul class="ships"><li><a href="{E(fa['url'])}" target="_blank" rel="noopener"><span class="s-name">{E(fa['name'])}の釣果情報</span><span class="s-go">›</span></a></li></ul></details>
+    </div>
+  </section>""")
     slides.append(HOWTO)
     return (TEMPLATE.replace("{{TITLE}}", f"たこ部屋週報 第{issue_no}号（{base.month}/{base.day}）")
             .replace("{{SLIDES}}", "".join(slides)).replace("{{FISH_CSS}}", FISH_CSS))
@@ -334,6 +412,12 @@ HOWTO = """
         <dt>○軒・○便</dt><dd>今週その魚の釣果を報告した船宿の数と、便の数。2便未満のものは「参考値」として薄く表示しています。</dd>
       </dl>
 
+      <div class="sec-title">陸っぱり・施設の数字</div>
+      <dl>
+        <dt>来場者100人あたり（横浜の海釣り施設）</dt><dd>施設が毎日公表する魚種ごとの釣れた数（施設全体の合計）を、その週の来場者数の合計で割り、100人あたりにしたもの。混む週末も空いた平日も同じ物差しで比べられます。大黒・磯子・本牧の3施設を合わせています。</dd>
+        <dt>今週あがった日（東扇島西公園・九十九里海釣りセンター）</dt><dd>数の公表がない釣り場では、その魚が報告された日数で調子を表しています。東扇島西公園は釣果まとめサイト（ウオスク）に集まる釣具店や釣り人の投稿、九十九里海釣りセンターは施設の毎日の釣果記事が元です。</dd>
+      </dl>
+
       <div class="sec-title">状態の見方</div>
       <dl class="status-dl">
         <dt><span class="badge hot">狙い目</span></dt><dd>複数の船宿・複数の日で好調が裏付けられ、今週とくに勧められるもの。</dd>
@@ -345,7 +429,7 @@ HOWTO = """
       <p>状態は、数字だけでなく、各船宿の釣果コメント・直近3週の傾向・前年との比較を合わせて判断しています。</p>
 
       <div class="sec-title">データについて</div>
-      <p>各船宿が<a href="https://www.chowari.jp/" target="_blank" rel="noopener">釣割</a>に掲載している釣果を、毎週集計しています。直近5週分と、前年の同じ時期の分を使います。各エリアのページの「出典の釣船屋」から、元の釣果ページを確認できます。</p>
+      <p>船は、各船宿が<a href="https://www.chowari.jp/" target="_blank" rel="noopener">釣割</a>に掲載している釣果と、一部船宿の公式サイトの釣果を、毎週集計しています。陸っぱり・施設は、横浜フィッシングピアーズ・ウオスク・九十九里海釣りセンターの公開情報が元です。直近5週分と、前年の同じ時期の分を使います。各エリアのページの「出典の釣船屋」から、元の釣果ページを確認できます。</p>
     </div>
   </section>"""
 
@@ -429,7 +513,12 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .log{font-size:14px;line-height:1.75;color:#dfeaf1}.log li{margin:4px 0}
 .toc{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .toc a{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:10px 12px;text-decoration:none;display:flex;flex-direction:column}
-.toc a b{font-size:15px}.toc a span{font-size:12px;color:#9fc0d4}
+.toc a b{font-size:15px}
+.toc-shore a{padding-left:12px!important}.toc-shore a b{font-size:13.5px}
+.band-shore{background:linear-gradient(160deg,#1d4a5e,#123044)}
+.kind{font-size:11px;letter-spacing:.2em;color:#9fd3c7;margin-top:6px}
+.s-plain{color:var(--ink)!important;font-weight:700}
+.ships li:not(:has(a)){display:flex;justify-content:space-between;padding:10px 8px;border-top:1px solid var(--line)}.toc a span{font-size:12px;color:#9fc0d4}
 .to-fish{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:14px 16px;border-radius:12px;background:#eef4f8;color:var(--navy);font-weight:700;text-decoration:none}
 .to-fish span{font-size:22px;line-height:1}
 .quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0 4px}

@@ -34,7 +34,7 @@ ALIASES = {
     "ホンガツオ": "カツオ", "マルソウダ": "ソウダガツオ", "ヒラソウダ": "ソウダガツオ",
     "キハダマグロ": "キハダ", "キメジ": "キハダ",
     "スミイカ": "スミイカ", "コウイカ": "スミイカ",
-    "ムギイカ": "スルメイカ", "スルメ": "スルメイカ",
+    "ムギイカ": "スルメイカ", "スルメ": "スルメイカ", "カタクチイワシ": "イワシ", "ウルメイワシ": "イワシ", "マイワシ": "イワシ",
 }
 
 
@@ -161,6 +161,84 @@ def load_trips(base):
     return recent, season, last
 
 
+def agg_facility(f, weeks, trips):
+    """陸っぱり・施設の集計。
+    kind=count（横浜の海づり施設）: 魚種ごとの釣れた数を来場者数で割り、100人あたりで比べる。
+    kind=days（東扇島・九十九里）: 数が無いので、その魚が報告された日数・件数で調子を見る。"""
+    items = f.get("items", [])
+    inwk = lambda it, w: w[0] <= it["date"] <= w[1]
+    fish = defaultdict(lambda: {"wk_cnt": [0] * len(weeks), "days": [set() for _ in weeks], "smin": None, "smax": None,
+                                "unit": "", "by": defaultdict(int), "posts": []})
+    visitors = [0] * len(weeks)
+    report_days = [set() for _ in weeks]
+    seen = set()
+    for it in items:
+        for i, w in enumerate(weeks):
+            if not inwk(it, w):
+                continue
+            report_days[i].add(it["date"])
+            key = (it.get("facility"), it["date"])
+            if it.get("visitors") and key not in seen:
+                seen.add(key)
+                visitors[i] += it["visitors"]
+            for fx in it["fish"]:
+                k = norm(fx["name"])
+                e = fish[k]
+                e["days"][i].add(it["date"])
+                if fx.get("count"):
+                    e["wk_cnt"][i] += fx["count"]
+                    if i == 0:
+                        e["by"][it.get("facility") or ""] += fx["count"]
+                if i == 0:
+                    if fx.get("size_max"):
+                        e["unit"] = fx.get("unit") or e["unit"]
+                        e["smin"] = min(e["smin"], fx["size_min"]) if e["smin"] is not None else fx["size_min"]
+                        e["smax"] = max(e["smax"], fx["size_max"]) if e["smax"] is not None else fx["size_max"]
+                    if it.get("url"):
+                        e["posts"].append({"date": it["date"], "title": it.get("title") or f"{it['date'][5:]}の釣果", "url": it["url"],
+                                           "source": it.get("source", "")})
+    # 前年同期（count のみ）
+    ly_cnt, ly_vis, ly_seen = defaultdict(int), 0, set()
+    for it in f.get("lastyear", []):
+        key = (it.get("facility"), it["date"])
+        if it.get("visitors") and key not in ly_seen:
+            ly_seen.add(key)
+            ly_vis += it["visitors"]
+        for fx in it["fish"]:
+            if fx.get("count"):
+                ly_cnt[norm(fx["name"])] += fx["count"]
+    rows = []
+    for k, e in fish.items():
+        nd0 = len(e["days"][0])
+        if not nd0:
+            continue
+        row = {"fish": k, "days": nd0, "report_days": len(report_days[0]),
+               "days_series": list(reversed([len(d) for d in e["days"]])),
+               "posts": sorted(e["posts"], key=lambda x: x["date"], reverse=True)[:8]}
+        if f.get("kind") == "count":
+            per = [round(c / v * 100, 1) if v else None for c, v in zip(e["wk_cnt"], visitors)]
+            ly = round(ly_cnt[k] / ly_vis * 100, 1) if ly_vis and ly_cnt.get(k) else None
+            ratio = lambda a, b: round(a / b - 1, 2) if (a and b and b >= 0.5) else None  # 基準が小さすぎる比較は出さない
+            row.update({"total": e["wk_cnt"][0], "per100": per[0], "series": list(reversed(per)),
+                        "wow": ratio(per[0], per[1] if len(per) > 1 else None),
+                        "lastyear": ly, "yoy": ratio(per[0], ly),
+                        "size_min": e["smin"], "size_max": e["smax"], "size_unit": e["unit"],
+                        "by_facility": dict(sorted(e["by"].items(), key=lambda x: -x[1])),
+                        "minor": e["wk_cnt"][0] < 5})
+        else:
+            row.update({"minor": nd0 < 2 and len(report_days[0]) > 2})
+        rows.append(row)
+    if f.get("kind") == "count":
+        rows.sort(key=lambda r: (r["minor"], -(r["per100"] or 0)))
+    else:
+        rows.sort(key=lambda r: (r["minor"], -r["days"]))
+    comments = [f"{it['date'][5:]}{('・' + it['facility']) if it.get('facility') else ''} {it.get('comment') or it.get('title', '')}"[:200]
+                for it in sorted(items, key=lambda x: x["date"], reverse=True) if inwk(it, weeks[0])][:12]
+    return {"name": f["name"], "kind": f.get("kind"), "sub": f.get("sub", ""), "url": f.get("url", ""),
+            "visitors": visitors[0], "report_days": len(report_days[0]), "fish": rows, "comments": comments,
+            "water": [it.get("water") for it in items if inwk(it, weeks[0]) and it.get("water")][:1]}
+
+
 def main():
     date = sys.argv[1] if len(sys.argv) > 1 else dt.date.today().isoformat()
     raw = json.loads((ROOT / "data" / "raw" / f"{date}.json").read_text(encoding="utf-8"))
@@ -254,6 +332,25 @@ def main():
             stab = f" / 安定度: 今週{r['steady_total']}便中{r['steady_good']}便が5週の標準以上" if r["steady_good"] is not None else ""
             digest.append(f"週ごとの推移（古→新）: {ser} / 直近3週平均 {r['avg3']}（前年比 {pct(r['yoy3'])}）{stab}\n")
             digest += [f"- {c}\n" for c in r["comments"]]
+
+    summary["facilities"] = []
+    digest.append("\n# 陸っぱり・施設\n")
+    for f in raw.get("facilities", []):
+        fa = agg_facility(f, weeks, trips)
+        summary["facilities"].append(fa)
+        digest.append(f"\n## {fa['name']}（{fa['sub']}・今週の報告 {fa['report_days']}日" + (f"・来場者計 {fa['visitors']}人" if fa['visitors'] else "") + "）\n")
+        for r in fa["fish"]:
+            if r["minor"]:
+                continue
+            mark = " ※本人が最近釣行済み（picks から外す）" if trips.get(r["fish"]) else ""
+            if fa["kind"] == "count":
+                pct = lambda x: "—" if x is None else f"{x:+.0%}"
+                ser = " → ".join("—" if v is None else f"{v:g}" for v in r["series"])
+                digest.append(f"- {r['fish']}: 100人あたり{r['per100']}匹（週計{r['total']}）/ 前週比{pct(r['wow'])} 前年比{pct(r['yoy'])} / 推移 {ser} / {r['days']}日{mark}\n")
+            else:
+                ser = " → ".join(str(v) for v in r["days_series"])
+                digest.append(f"- {r['fish']}: {r['days']}/{r['report_days']}日で報告 / 日数の推移 {ser}{mark}\n")
+        digest.append("コメント・投稿:\n" + "".join(f"  - {c}\n" for c in fa["comments"]))
 
     out = ROOT / "data" / "summary" / f"{date}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
