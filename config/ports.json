@@ -4,6 +4,14 @@
    "name": "羽田",
    "ships": [
     {
+     "id": "kamiya",
+     "name": "かみや",
+     "port": "羽田",
+     "source": "blog",
+     "base": "https://www.haneda-kamiya.com",
+     "url": "https://www.haneda-kamiya.com/category/Choka/"
+    },
+    {
      "id": "01226",
      "name": "高松丸",
      "port": "多摩川"

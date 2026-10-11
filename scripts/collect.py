@@ -110,6 +110,66 @@ def fetch_ship(ship_id, since, until, dt_param=None, max_pages=8):
     return res
 
 
+# ---- 船宿の公式サイト（羽田かみや・かめだや等が使っている釣果ブログ形式） ----
+BLOG_RE = re.compile(r'<div class="blog">(.*?)(?=<div class="blog">|<div id="links-right"|\Z)', re.S)
+BLOG_FISH_RE = re.compile(r'<span class="fish-name">(.*?)</span>.*?<span class="fish-num">(.*?)</span>\s*<br\s*/?>(?:\s*<span class="fish-comment">(.*?)</span>)?', re.S)
+RANGE_RE = re.compile(r'(\d+(?:\.\d+)?)\s*[-～~]\s*(\d+(?:\.\d+)?)\s*(匹|本|枚|杯|尾|cm|kg)')
+SINGLE_RE = re.compile(r'(\d+(?:\.\d+)?)\s*(匹|本|枚|杯|尾|cm|kg)')
+
+
+def _ranges(txt):
+    txt = clean(txt).replace("ｃｍ", "cm").replace("ｋｇ", "kg")
+    out = {"size": None, "count": None}
+    for a, b, u in RANGE_RE.findall(txt):
+        out["size" if u in ("cm", "kg") else "count"] = (float(a), float(b), u)
+    if out["count"] is None:
+        for a, u in SINGLE_RE.findall(txt):
+            if u not in ("cm", "kg"):
+                out["count"] = (float(a), float(a), u)
+    return out, txt
+
+
+def parse_blog(text, ship_id):
+    out = []
+    for m in BLOG_RE.finditer(text):
+        block = m.group(1)
+        d = re.search(r'<h2 class="date">(\d{4})年(\d{1,2})月(\d{1,2})日</h2>', block)
+        if not d:
+            continue
+        title = clean((re.search(r'<h3 class="title">(.*?)</h3>', block, re.S) or [None, ""])[1])
+        fish, notes = [], []
+        for f in BLOG_FISH_RE.finditer(block):
+            r, txt = _ranges(f.group(2))
+            c, z = r["count"], r["size"]
+            fish.append({"name": clean(f.group(1)), "size": f"{z[0]:g}-{z[1]:g}{z[2]}" if z else "",
+                         "count": f"{c[0]:g}～{c[1]:g}{c[2]}" if c else txt,
+                         "min": c[0] if c else None, "max": c[1] if c else None, "unit": c[2] if c else "",
+                         "size_max": z[1] if z else None})
+            if f.group(3):
+                notes.append(clean(f.group(3)))
+        fish = [f for f in fish if f["min"] is not None]
+        if not fish:  # 休船・出船予定の記事は除く
+            continue
+        body = block.split("船長コメント", 1)[-1]
+        body = clean(re.sub(r"<br\s*/?>", " ", body))
+        body = re.sub(r"^：?\s*釣り座別釣果表.*?ご覧下さい！\s*", "", body)
+        out.append({"ship_id": ship_id, "choka_id": "", "title": title,
+                    "date": f"{int(d.group(1)):04d}-{int(d.group(2)):02d}-{int(d.group(3)):02d}", "tide": "",
+                    "fish": fish, "comment": (" / ".join(notes) + " " + body)[:400].strip()})
+    return out
+
+
+def fetch_blog(base, ship_id, since, until):
+    """日ごとの過去記事ページ（/search/Archive/YYYYMMDD/）を1日ずつ取る。"""
+    res = []
+    day = dt.date.fromisoformat(since)
+    while day.isoformat() <= until:
+        res += [it for it in parse_blog(get(f"{base}/search/Archive/{day:%Y%m%d}/"), ship_id) if it["date"] == day.isoformat()]
+        time.sleep(WAIT)
+        day += dt.timedelta(days=1)
+    return res
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", help="基準日 YYYY-MM-DD（省略時は今日）")
@@ -142,13 +202,19 @@ def main():
             if s["id"] in have:
                 ships.append({**have[s["id"]], **s})
                 continue
-            cur = fetch_ship(s["id"], since, until)
-            last = []
-            if not a.no_lastyear and cur:  # 今期に釣果がある船宿だけ前年も見る
-                for ym in ly_months:
-                    last += fetch_ship(s["id"], ly_since, ly_until, dt_param=ym)
+            if s.get("source") == "blog":
+                cur = fetch_blog(s["base"], s["id"], since, until)
+                last = fetch_blog(s["base"], s["id"], ly_since, ly_until) if (cur and not a.no_lastyear) else []
+                url = s.get("url") or f"{s['base']}/category/Choka/"
+            else:
+                cur = fetch_ship(s["id"], since, until)
+                last = []
+                if not a.no_lastyear and cur:  # 今期に釣果がある船宿だけ前年も見る
+                    for ym in ly_months:
+                        last += fetch_ship(s["id"], ly_since, ly_until, dt_param=ym)
+                url = f"{BASE}/ship/{s['id']}/catch/"
             print(f"  {s['name']}: 今期{len(cur)}件 前年{len(last)}件", file=sys.stderr)
-            ships.append({**s, "url": f"{BASE}/ship/{s['id']}/catch/", "catches": cur, "lastyear": last})
+            ships.append({**s, "url": url, "catches": cur, "lastyear": last})
         out["groups"].append({"name": g["name"], "ships": ships})
 
     p.parent.mkdir(parents=True, exist_ok=True)

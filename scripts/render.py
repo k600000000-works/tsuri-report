@@ -329,9 +329,10 @@ TEMPLATE = """<!doctype html>
 <title>{{TITLE}}</title>
 <meta property="og:title" content="{{TITLE}}">
 <meta property="og:description" content="関東の船釣り、港別・魚種別の釣果まとめ。毎週金曜更新">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="https://k600000000-works.github.io/tsuri-report/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="https://k600000000-works.github.io/tsuri-report/icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="https://k600000000-works.github.io/tsuri-report/icons/icon-192.png">
+<link rel="manifest" href="https://k600000000-works.github.io/tsuri-report/manifest.webmanifest">
 <meta name="apple-mobile-web-app-title" content="たこ部屋週報">
 <meta name="application-name" content="たこ部屋週報">
 <meta name="theme-color" content="#0c2238">
@@ -547,7 +548,7 @@ def main():
     (ROOT / "index.html").write_text(page, encoding="utf-8")
     arc = ROOT / "archive"
     arc.mkdir(exist_ok=True)
-    (arc / f"{date}.html").write_text(page.replace('href="archive/"', 'href="./"').replace('href="icons/', 'href="../icons/'), encoding="utf-8")
+    (arc / f"{date}.html").write_text(page.replace('href="archive/"', 'href="./"'), encoding="utf-8")
     items = sorted((p.stem for p in arc.glob("20*.html")), reverse=True)
     lis = "".join(f'<li><a href="{d}.html">{d.replace("-", "/")} 号</a></li>' for d in items)
     (arc / "index.html").write_text(
