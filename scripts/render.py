@@ -169,7 +169,12 @@ def by_fish(summary, notes):
     return sorted(d.items(), key=score)
 
 
-def build(summary, picks):
+OCTO = ('<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M20 30 C16 12 26 4 32 4 C38 4 48 12 44 30 Z" class="o-head"/>'
+        '<path d="M22 28 C16 38 8 36 6 46 M27 30 C24 42 20 48 18 58 M32 30 C32 44 30 52 32 60 M37 30 C40 42 44 48 46 58 '
+        'M42 28 C48 38 56 36 58 46" class="o-arm"/><circle cx="27" cy="20" r="2.2" class="o-eye"/><circle cx="37" cy="20" r="2.2" class="o-eye"/></svg>')
+
+
+def build(summary, picks, issue_no=1):
     base = dt.date.fromisoformat(summary["base_date"])
     wk = "月火水木金土日"[base.weekday()]
     notes = picks.get("notes", {})
@@ -209,9 +214,13 @@ def build(summary, picks):
     slides.append(f"""
   <section class="slide cover" id="top">
     <div class="wrap">
-      <div class="eyebrow">KANTO BOAT FISHING · WEEKLY</div>
-      <h1>週間釣果レポート</h1>
-      <p class="issue">{base.year}年{base.month}月{base.day}日（{wk}）号<span>集計期間 {period}</span></p>
+      <header class="mast">
+        <div class="mast-rule"><span></span><i class="mast-emblem">{OCTO}</i><span></span></div>
+        <h1 class="mast-title">たこ部屋週報</h1>
+        <div class="mast-sub">TAKOBEYA WEEKLY<b>—</b>関東船釣り釣果</div>
+        <div class="mast-double"></div>
+        <div class="mast-issue"><span>第{issue_no}号</span><span>{base.year}年{base.month}月{base.day}日（{wk}）</span><span>集計 {period}</span></div>
+      </header>
       <div class="sec-title">全エリア総評</div>
       <p class="overall">{E(picks.get('headline', '今週の総評はありません。'))}</p>
       <div class="sec-title">今週の狙い目</div>
@@ -224,6 +233,7 @@ def build(summary, picks):
       <a class="to-fish" href="#by-fish">魚種別に、好調な港を見る <span>›</span></a>
       <p class="hint">横にスワイプすると、魚種別・エリア別のページに進みます</p>
     </div>
+    <div class="mast-ghost" aria-hidden="true">{OCTO}</div>
     <svg class="waves" viewBox="0 0 1200 60" preserveAspectRatio="none" aria-hidden="true"><path d="M0,30 C150,0 300,60 450,30 C600,0 750,60 900,30 C1050,0 1200,50 1200,30 L1200,60 L0,60 Z"/></svg>
   </section>""")
 
@@ -264,7 +274,7 @@ def build(summary, picks):
     </div>
   </section>""")
 
-    return (TEMPLATE.replace("{{TITLE}}", f"週間釣果レポート {base.month}/{base.day}号")
+    return (TEMPLATE.replace("{{TITLE}}", f"たこ部屋週報 第{issue_no}号（{base.month}/{base.day}）")
             .replace("{{SLIDES}}", "".join(slides)).replace("{{FISH_CSS}}", FISH_CSS))
 
 
@@ -275,7 +285,7 @@ TEMPLATE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{TITLE}}</title>
 <meta property="og:title" content="{{TITLE}}">
-<meta property="og:description" content="関東の船釣り、港別・魚種別の釣果まとめ（毎週金曜更新）">
+<meta property="og:description" content="関東の船釣り、港別・魚種別の釣果まとめ。毎週金曜更新">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -306,9 +316,21 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .cover{background:radial-gradient(120% 70% at 80% 0%,#1f5a82 0%,var(--navy2) 35%,var(--navy) 75%);color:#eef4f8}
 .cover .wrap{padding-top:28px;padding-bottom:40px}
 .cover .sec-title{color:#8fc3e3}
-.eyebrow{font-size:11px;letter-spacing:.28em;color:#8fc3e3}
-.cover h1{font-size:34px;margin:6px 0 4px;line-height:1.25}
-.issue{margin:0;font-size:14px;color:#cfe0ea}.issue span{display:block;font-size:12px;color:#8fb0c4}
+.mast{text-align:center;padding-top:6px;position:relative;z-index:1}
+.mast-rule{display:flex;align-items:center;gap:12px;color:#c9a96a}
+.mast-rule span{flex:1;height:1px;background:linear-gradient(90deg,transparent,#c9a96a)}
+.mast-rule span:last-child{background:linear-gradient(90deg,#c9a96a,transparent)}
+.mast-emblem{width:38px;height:38px;border:1.5px solid #c9a96a;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.mast-emblem svg{width:24px;height:24px}
+.mast-emblem .o-head{fill:none;stroke:#e9d5a8;stroke-width:3}.mast-emblem .o-arm{fill:none;stroke:#e9d5a8;stroke-width:3;stroke-linecap:round}.mast-emblem .o-eye{fill:#e9d5a8}
+.mast-title{font-family:"Noto Serif JP",serif;font-weight:700;font-size:44px;letter-spacing:.14em;margin:12px 0 2px;padding-left:.14em;line-height:1.15;
+  color:#f6ecd6;text-shadow:0 2px 0 rgba(0,0,0,.25)}
+.mast-sub{font-size:11px;letter-spacing:.32em;color:#c9a96a}.mast-sub b{font-weight:400;margin:0 .6em;letter-spacing:0}
+.mast-double{height:5px;border-top:1px solid rgba(233,213,168,.55);border-bottom:1px solid rgba(233,213,168,.55);margin:14px 0 8px}
+.mast-issue{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#cfe0ea;flex-wrap:wrap}
+.mast-issue span:first-child{font-family:"Noto Serif JP",serif;font-weight:700;color:#f6ecd6}
+.mast-ghost{position:absolute;top:-10px;right:-40px;width:240px;height:240px;opacity:.06;pointer-events:none}
+.mast-ghost svg{width:100%;height:100%}.mast-ghost .o-head{fill:#fff}.mast-ghost .o-arm{fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round}.mast-ghost .o-eye{fill:var(--navy)}
 .overall{margin:0;font-size:16px;line-height:1.8;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:14px 16px}
 .picks{display:grid;gap:12px}
 .pick{display:grid;grid-template-columns:76px 1fr;gap:4px 12px;text-decoration:none;background:#fffdf7;color:#1b2530;border-radius:16px;padding:14px 14px 0;border-left:6px solid var(--buoy);box-shadow:0 6px 18px rgba(0,0,0,.25)}
@@ -413,7 +435,7 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 <body>
 <main class="deck" id="deck">{{SLIDES}}
 </main>
-<div class="foot" id="dots"><a href="archive/">過去の号</a></div>
+<div class="foot" id="dots"><a href="archive/">バックナンバー</a></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function(){
@@ -459,7 +481,9 @@ def main():
     summary = json.loads((ROOT / "data" / "summary" / f"{date}.json").read_text(encoding="utf-8"))
     pp = ROOT / "data" / "picks" / f"{date}.json"
     picks = json.loads(pp.read_text(encoding="utf-8")) if pp.exists() else {}
-    page = build(summary, picks)
+    arc_dir = ROOT / "archive"
+    issue_no = len({p.stem for p in arc_dir.glob("20*.html") if p.stem < date} | {date})
+    page = build(summary, picks, issue_no)
     (ROOT / "index.html").write_text(page, encoding="utf-8")
     arc = ROOT / "archive"
     arc.mkdir(exist_ok=True)
@@ -468,9 +492,9 @@ def main():
     lis = "".join(f'<li><a href="{d}.html">{d.replace("-", "/")} 号</a></li>' for d in items)
     (arc / "index.html").write_text(
         '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-        '<title>過去の号</title><style>body{font-family:"Noto Sans JP",system-ui,sans-serif;max-width:640px;margin:0 auto;padding:24px 16px;'
+        '<title>たこ部屋週報 バックナンバー</title><style>body{font-family:"Noto Sans JP",system-ui,sans-serif;max-width:640px;margin:0 auto;padding:24px 16px;'
         'background:#f5f2ea;color:#1b2530}@media(prefers-color-scheme:dark){body{background:#0f1a24;color:#e6ecf0}a{color:#8fc3e3}}'
-        'h1{font-family:serif}li{margin:10px 0;font-size:17px}</style></head><body><h1>週間釣果レポート 過去の号</h1><p><a href="../">最新号へ</a></p>'
+        'h1{font-family:serif}li{margin:10px 0;font-size:17px}</style></head><body><h1>たこ部屋週報 バックナンバー</h1><p><a href="../">最新号へ</a></p>'
         f'<ul>{lis}</ul></body></html>', encoding="utf-8")
     print("rendered index.html")
 
