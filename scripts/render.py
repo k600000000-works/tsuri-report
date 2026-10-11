@@ -30,8 +30,10 @@ STATUS = {  # status -> (ラベル, CSSクラス, 並び順)
 GEO = {
     "羽田": {"sub": "羽田・平和島・品川・川崎", "c": [35.565, 139.75], "z": 11,
            "m": [["羽田", 35.550, 139.752], ["平和島", 35.583, 139.742], ["品川", 35.600, 139.748], ["川崎", 35.533, 139.728]]},
-    "横浜・金沢八景": {"sub": "本牧・新山下・根岸・金沢八景", "c": [35.385, 139.655], "z": 11,
-                 "m": [["本牧", 35.414, 139.676], ["新山下", 35.437, 139.655], ["金沢八景", 35.335, 139.628]]},
+    "横浜": {"sub": "新山下・本牧・根岸", "c": [35.425, 139.66], "z": 12,
+           "m": [["新山下", 35.437, 139.655], ["本牧", 35.414, 139.676], ["根岸", 35.405, 139.632]]},
+    "金沢八景": {"sub": "柴・金沢漁港・金沢八景", "c": [35.345, 139.635], "z": 13,
+             "m": [["柴", 35.360, 139.641], ["金沢漁港", 35.350, 139.643], ["金沢八景", 35.335, 139.628]]},
     "東京湾口": {"sub": "走水・鴨居・久里浜・金田・松輪・剣崎", "c": [35.20, 139.70], "z": 10,
              "m": [["走水", 35.258, 139.735], ["久里浜", 35.226, 139.713], ["金田", 35.170, 139.685], ["松輪・剣崎", 35.143, 139.676]]},
     "内房": {"sub": "富津・上総湊・竹岡・金谷", "c": [35.235, 139.84], "z": 10,
@@ -452,6 +454,15 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .map{height:150px;background:#cfdde6}
 .band .map{max-width:640px;margin:0 auto;border-top:1px solid rgba(255,255,255,.15)}
 .map-overview{height:240px;border-radius:14px;overflow:hidden}
+.map{position:relative;cursor:zoom-in}
+.map::after{content:"タップで拡大";position:absolute;right:6px;top:6px;z-index:500;font-size:10.5px;background:rgba(12,34,56,.78);color:#fff;padding:2px 8px;border-radius:999px;pointer-events:none}
+.map-modal{position:fixed;inset:0;z-index:3000;background:var(--navy);display:flex;flex-direction:column}
+.map-modal[hidden]{display:none}
+.mm-bar{display:flex;justify-content:space-between;align-items:center;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;color:#f6ecd6}
+.mm-bar b{font-family:"Noto Serif JP",serif;font-size:18px}
+.mm-bar button{background:none;border:1px solid rgba(233,213,168,.5);color:#f6ecd6;width:36px;height:36px;border-radius:50%;font-size:20px;line-height:1}
+#mmMap{flex:1}
+.mm-hint{margin:0;padding:8px 14px calc(8px + env(safe-area-inset-bottom));font-size:12px;color:#9fc0d4;text-align:center}
 .map-label{background:var(--navy);color:#fff;border:none;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:700;box-shadow:none}
 .map-label::before{display:none}
 .num-pin{display:flex!important;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--buoy);color:#fff;
@@ -530,6 +541,7 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 <body>
 <main class="deck" id="deck">{{SLIDES}}
 </main>
+<div class="map-modal" id="mapModal" hidden><div class="mm-bar"><b id="mmTitle"></b><button type="button" id="mmClose" aria-label="閉じる">×</button></div><div id="mmMap"></div><p class="mm-hint">2本指で拡大・移動できます</p></div>
 <div class="foot" id="dots"><a href="archive/">バックナンバー</a></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -572,15 +584,32 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
   var still={dragging:false,zoomControl:false,scrollWheelZoom:false,touchZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false};
   function pin(m,lat,lng,label){L.circleMarker([lat,lng],{radius:6,color:'#fff',weight:2,fillColor:'#d9531e',fillOpacity:1}).addTo(m)
     .bindTooltip(label,{permanent:true,direction:'right',offset:[6,0],className:'map-label'});}
+  var modal=document.getElementById('mapModal'),big=null;
+  var LEFT={'横浜':1,'東京湾口':0,'相模湾東側':1,'金沢八景':1};
+  function openBig(title,draw){document.getElementById('mmTitle').textContent=title;modal.hidden=false;
+    if(big){big.remove();big=null;}
+    big=L.map('mmMap',{zoomControl:true,tap:false});L.tileLayer(tiles,{attribution:attr,maxZoom:18}).addTo(big);draw(big);
+    setTimeout(function(){big.invalidateSize();},50);history.pushState({id:curId(),modal:1},'',location.hash);}
+  function closeBig(){if(modal.hidden)return;modal.hidden=true;if(big){big.remove();big=null;}}
+  document.getElementById('mmClose').addEventListener('click',function(){if(history.state&&history.state.modal)history.back();else closeBig();});
+  window.addEventListener('popstate',function(){closeBig();});
   document.querySelectorAll('.map[data-map]').forEach(function(el){var d=JSON.parse(el.dataset.map);if(!d.c)return;
     var m=L.map(el,still).setView(d.c,d.z);L.tileLayer(tiles,{attribution:attr,maxZoom:18}).addTo(m);
-    d.m.forEach(function(p){pin(m,p[1],p[2],p[0]);});});
+    d.m.forEach(function(p){pin(m,p[1],p[2],p[0]);});
+    el.addEventListener('click',function(){var title=el.closest('.slide').querySelector('h2').textContent;
+      openBig(title,function(bm){bm.setView(d.c,d.z+1);d.m.forEach(function(p){pin(bm,p[1],p[2],p[0]);});});});});
   document.querySelectorAll('.map[data-overview]').forEach(function(el){var d=JSON.parse(el.dataset.overview);
     var m=L.map(el,still);L.tileLayer(tiles,{attribution:attr,maxZoom:18}).addTo(m);
     var b=[];d.forEach(function(p,i){b.push([p[1],p[2]]);
       L.marker([p[1],p[2]],{icon:L.divIcon({className:'num-pin',html:String(i+1),iconSize:[22,22]})}).addTo(m)
        .on('click',function(){var here=curId();if(jump('g-'+p[0]))history.pushState({id:'g-'+p[0],from:here},'','#g-'+p[0]);});});
-    m.fitBounds(b,{padding:[22,22]});});
+    m.fitBounds(b,{padding:[22,22]});
+    el.addEventListener('click',function(e){if(e.target.closest('.num-pin'))return;
+      openBig('エリア',function(bm){var bb=[];d.forEach(function(p,i){bb.push([p[1],p[2]]);
+        L.marker([p[1],p[2]],{icon:L.divIcon({className:'num-pin',html:String(i+1),iconSize:[22,22]})}).addTo(bm)
+          .bindTooltip(p[0],{permanent:true,direction:LEFT[p[0]]?'left':'right',offset:[LEFT[p[0]]?-10:10,0],className:'map-label'})
+          .on('click',function(){var here=curId();history.back();setTimeout(function(){if(jump('g-'+p[0]))history.pushState({id:'g-'+p[0],from:here},'','#g-'+p[0]);},60);});});
+        bm.fitBounds(bb,{padding:[40,40]});});});});
 })();
 </script>
 </body>
