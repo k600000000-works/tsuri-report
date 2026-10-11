@@ -1,7 +1,7 @@
 """釣割（chowari.jp）から各船宿の釣果を集める。
 
 使い方:
-  python scripts/collect.py                 # 今日を基準に直近14日 + 前年同時期を取得
+  python scripts/collect.py                 # 今日を基準に直近35日（5週） + 前年同時期を取得
   python scripts/collect.py --date 2026-10-16
 
 出力: data/raw/<基準日>.json
@@ -113,8 +113,9 @@ def fetch_ship(ship_id, since, until, dt_param=None, max_pages=8):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", help="基準日 YYYY-MM-DD（省略時は今日）")
-    ap.add_argument("--days", type=int, default=14)
+    ap.add_argument("--days", type=int, default=35)
     ap.add_argument("--no-lastyear", action="store_true")
+    ap.add_argument("--merge", action="store_true", help="既存の data/raw/<日付>.json に無い船宿だけ取得して足す")
     a = ap.parse_args()
 
     base = dt.date.fromisoformat(a.date) if a.date else dt.date.today()
@@ -127,11 +128,20 @@ def main():
     ly_months = sorted({ly_since[2:7].replace("-", ""), ly_until[2:7].replace("-", "")}, reverse=True)
 
     cfg = json.loads((ROOT / "config" / "ports.json").read_text(encoding="utf-8"))
+    p = ROOT / "data" / "raw" / f"{until}.json"
+    have = {}
+    if a.merge and p.exists():
+        for g in json.loads(p.read_text(encoding="utf-8"))["groups"]:
+            for s in g["ships"]:
+                have[s["id"]] = s
     out = {"base_date": until, "since": since, "lastyear": [ly_since, ly_until], "groups": []}
     for g in cfg["groups"]:
         print(f"[{g['name']}] {len(g['ships'])}軒", file=sys.stderr)
         ships = []
         for s in g["ships"]:
+            if s["id"] in have:
+                ships.append({**have[s["id"]], **s})
+                continue
             cur = fetch_ship(s["id"], since, until)
             last = []
             if not a.no_lastyear and cur:  # 今期に釣果がある船宿だけ前年も見る
@@ -141,7 +151,6 @@ def main():
             ships.append({**s, "url": f"{BASE}/ship/{s['id']}/catch/", "catches": cur, "lastyear": last})
         out["groups"].append({"name": g["name"], "ships": ships})
 
-    p = ROOT / "data" / "raw" / f"{until}.json"
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"saved {p}", file=sys.stderr)

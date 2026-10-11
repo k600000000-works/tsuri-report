@@ -2,3 +2,6 @@ data/raw/
 data/digest/
 data/summary/
 __pycache__/
+config/trips.json
+_icons_test.html
+_preview/
