@@ -269,7 +269,7 @@ def build(summary, picks, issue_no=1):
         fish_cards.append(f'<div class="fcard"><div class="fcard-head"><div class="r-icon">{icon(fish)}</div><h3>{E(fish)}</h3></div>{items}</div>')
     slides.append(f"""
   <section class="slide page" id="by-fish">
-    <header class="band"><div class="band-in"><a class="back" href="#top">‹ TOP</a><h2>魚種別</h2><p>魚種ごとに、どの港の調子が良いかを並べています。港名をタップすると、そのエリアのページに移ります。</p></div></header>
+    <header class="band"><div class="band-in"><div class="navrow"><a class="back js-back" href="#top">‹ 戻る</a><a class="back" href="#top">TOP</a></div><h2>魚種別</h2><p>魚種ごとに、どの港の調子が良いかを並べています。港名をタップすると、そのエリアのページに移ります。</p></div></header>
     <div class="wrap"><div class="fcards">{''.join(fish_cards)}</div></div>
   </section>""")
 
@@ -282,7 +282,7 @@ def build(summary, picks, issue_no=1):
         mapdata = json.dumps({"c": geo.get("c"), "z": geo.get("z"), "m": geo.get("m", [])}, ensure_ascii=False)
         slides.append(f"""
   <section class="slide page" id="g-{E(g['name'])}">
-    <header class="band"><div class="band-in"><a class="back" href="#top">‹ TOP</a><h2>{E(g['name'])}</h2><p>{E(geo.get('sub', ''))}</p></div>
+    <header class="band"><div class="band-in"><div class="navrow"><a class="back js-back" href="#top">‹ 戻る</a><a class="back" href="#top">TOP</a></div><h2>{E(g['name'])}</h2><p>{E(geo.get('sub', ''))}</p></div>
       <div class="map" data-map='{E(mapdata)}'></div></header>
     <div class="wrap">
       {f'<div class="sec-title">概況</div><p class="g-summary">{E(n["summary"])}</p>' if n.get("summary") else ''}
@@ -300,7 +300,7 @@ def build(summary, picks, issue_no=1):
 
 HOWTO = """
   <section class="slide page" id="howto">
-    <header class="band"><div class="band-in"><a class="back" href="#top">‹ TOP</a><h2>数値の見方</h2><p>このレポートの数字の出し方と、表示の意味です。</p></div></header>
+    <header class="band"><div class="band-in"><div class="navrow"><a class="back js-back" href="#top">‹ 戻る</a><a class="back" href="#top">TOP</a></div><h2>数値の見方</h2><p>このレポートの数字の出し方と、表示の意味です。</p></div></header>
     <div class="wrap howto">
       <div class="sec-title">スソ〜竿頭（大きな数字）</div>
       <p>各魚種の大きな数字は「<b>ふつうの日の竿頭</b>」、その左の小さな数字は「<b>ふつうの日のスソ</b>」です。船宿が公表する「○〜○匹」の書き方に合わせています。</p>
@@ -447,7 +447,8 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .band-in{max-width:640px;margin:0 auto;padding:16px 16px 14px}
 .band h2{font-size:28px;margin:4px 0 2px}
 .band p{margin:0;font-size:13px;color:#a9c6d8}
-.back{font-size:13px;color:#8fc3e3;text-decoration:none}
+.back{font-size:13px;color:#8fc3e3;text-decoration:none;padding:4px 0}
+.navrow{display:flex;justify-content:space-between}
 .map{height:150px;background:#cfdde6}
 .band .map{max-width:640px;margin:0 auto;border-top:1px solid rgba(255,255,255,.15)}
 .map-overview{height:240px;border-radius:14px;overflow:hidden}
@@ -537,11 +538,25 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
   function upd(){var i=Math.round(deck.scrollLeft/deck.clientWidth);ds.forEach(function(d,j){d.classList.toggle('on',i===j);});}
   deck.addEventListener('scroll',upd,{passive:true});upd();
   document.addEventListener('keydown',function(e){if(e.key==='ArrowRight')deck.scrollBy({left:deck.clientWidth});if(e.key==='ArrowLeft')deck.scrollBy({left:-deck.clientWidth});});
-  // ページ内リンク: 横スクロールで移動して縦位置を先頭へ
-  document.addEventListener('click',function(e){var a=e.target.closest('a[href^="#"]');if(!a)return;var t=document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1)));if(!t)return;
-    e.preventDefault();if(!t.classList.contains('slide')){var sl=t.closest('.slide');sl.scrollTo({top:t.offsetTop-12,behavior:'smooth'});return;}t.scrollTop=0;deck.scrollTo({left:t.offsetLeft});history.replaceState(null,'',a.getAttribute('href'));});
-  if(location.hash){var t=document.getElementById(decodeURIComponent(location.hash.slice(1)));if(t){deck.style.scrollBehavior='auto';deck.scrollLeft=t.offsetLeft;deck.style.scrollBehavior='';}}
-
+  // ページ移動: アニメーションなしで切り替え、履歴を残す（ブラウザの「戻る」で直前のページへ）
+  function jump(id){var t=document.getElementById(id);if(!t)return false;
+    if(!t.classList.contains('slide')){var sl=t.closest('.slide');jump(sl.id);sl.scrollTop=t.offsetTop-12;return true;}
+    deck.style.scrollSnapType='none';deck.style.scrollBehavior='auto';deck.scrollLeft=t.offsetLeft;
+    requestAnimationFrame(function(){requestAnimationFrame(function(){deck.style.scrollSnapType='';deck.style.scrollBehavior='';});});
+    return true;}
+  function curId(){var i=Math.round(deck.scrollLeft/deck.clientWidth);return slides[i]?slides[i].id:'top';}
+  history.replaceState({id:curId()},'',location.hash||'#top');
+  document.addEventListener('click',function(e){var a=e.target.closest('a[href^="#"]');if(!a)return;
+    if(a.classList.contains('js-back')){e.preventDefault();if(history.state&&history.state.from){history.back();}else{jump('top');history.pushState({id:'top'},'','#top');}return;}
+    var id=decodeURIComponent(a.getAttribute('href').slice(1));var t=document.getElementById(id);if(!t)return;e.preventDefault();
+    var here=curId();
+    if(t.classList.contains('slide')){t.scrollTop=0;}
+    if(jump(id))history.pushState({id:id,from:here},'','#'+id);});
+  window.addEventListener('popstate',function(e){var id=(e.state&&e.state.id)||decodeURIComponent((location.hash||'#top').slice(1));jump(id);});
+  // スワイプで移ったときは、履歴は増やさず現在地だけ更新する
+  var swipeT;deck.addEventListener('scroll',function(){clearTimeout(swipeT);swipeT=setTimeout(function(){var id=curId();
+    if(history.state&&history.state.id!==id)history.replaceState({id:id,from:history.state.from},'','#'+id);},250);},{passive:true});
+  if(location.hash){jump(decodeURIComponent(location.hash.slice(1)));}
   document.addEventListener('click',function(e){var c=e.target.closest('[data-cap]');if(!c)return;
     var f=c.closest('.lc');f.querySelector('.lc-cap').textContent=c.dataset.cap;
     f.querySelectorAll('.lc-pt').forEach(function(p){p.setAttribute('r',p.classList.contains('lc-now')?5:4);});
@@ -559,7 +574,7 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
     var m=L.map(el,still);L.tileLayer(tiles,{attribution:attr,maxZoom:18}).addTo(m);
     var b=[];d.forEach(function(p,i){b.push([p[1],p[2]]);
       L.marker([p[1],p[2]],{icon:L.divIcon({className:'num-pin',html:String(i+1),iconSize:[22,22]})}).addTo(m)
-       .on('click',function(){var t=document.getElementById('g-'+p[0]);if(t){t.scrollTop=0;deck.scrollTo({left:t.offsetLeft});}});});
+       .on('click',function(){var here=curId();if(jump('g-'+p[0]))history.pushState({id:'g-'+p[0],from:here},'','#g-'+p[0]);});});
     m.fitBounds(b,{padding:[22,22]});});
 })();
 </script>
