@@ -108,7 +108,7 @@ def fish_rows(g, notes):
           <div class="r-spark">{spark(r.get('series', []), hot)}<span>{len(r.get('series', []))}週推移</span></div>
           {chips(n)}
           {f'<p class="r-note">{E(n["note"])}</p>' if n.get('note') else ''}
-          <div class="r-more">{r['ships']}軒・{r['reports']}便{'・参考値' if r['minor'] else ''}<span>船宿別の釣果 ▾</span></div>
+          <div class="r-more">{r['ships']}軒・{r['reports']}便{f"・標準以上 {r['steady_good']}/{r['steady_total']}便" if r.get('steady_good') is not None else ''}{'・参考値' if r['minor'] else ''}<span>船宿別の釣果 ▾</span></div>
         </summary>
         <ul class="ships">{ships}</ul>
       </details>""")
@@ -220,7 +220,7 @@ def build(summary, picks):
       {f'<div class="sec-title">概況</div><p class="g-summary">{E(n["summary"])}</p>' if n.get("summary") else ''}
       <div class="sec-title">魚種別の釣果 <small>タップで船宿ごとの釣果へ</small></div>
       <div class="rows">{fish_rows(g, n)}</div>
-      <p class="legend">数値は1人あたりの釣果の目安。船宿ごとに「竿頭とスソの中間」を週平均し、それを船宿間で平均しています。棒グラフは直近の週ごとの推移（右端が今週）。</p>
+      <p class="legend">数値は1人あたりの釣果の目安です。便ごとに「竿頭とスソの中間」を出し、船宿ごとに週の中央値を取って、船宿間で平均しています（5軒以上なら最高・最低の1軒ずつを除く）。1日だけの大釣りや不調に左右されにくい値です。「標準以上」は、今週の便のうち、ここ5週の標準を上回った便の数。棒グラフは週ごとの推移（右端が今週）。</p>
       <details class="sources"><summary>出典の釣船屋（{len(g['sources'])}軒）</summary><ul class="ships">{src or '<li>なし</li>'}</ul></details>
     </div>
   </section>""")

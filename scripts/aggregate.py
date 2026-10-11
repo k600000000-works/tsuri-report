@@ -82,12 +82,30 @@ def ship_stats(catches):
     return d
 
 
+def ship_week(e):
+    """船宿の週の値 = 便ごとの代表値の中央値（1日だけの大釣り・大外れに引っ張られない）。"""
+    return statistics.median(e["vals"]) if e["vals"] else None
+
+
 def group_value(per_ship):
-    vals = [statistics.mean(e["vals"]) for e in per_ship if e["vals"]]
-    if len(vals) >= 3:  # 船中合計を1人分の欄に書いたような極端な値を除く
+    """エリアの値。5軒以上なら最高・最低の船宿を1軒ずつ除いて平均する。"""
+    vals = sorted(v for v in (ship_week(e) for e in per_ship) if v is not None)
+    if len(vals) >= 5:
+        vals = vals[1:-1]
+    elif len(vals) >= 3:  # 船中合計を1人分の欄に書いたような極端な値を除く
         med = statistics.median(vals)
         vals = [v for v in vals if v <= med * 5] or vals
     return round(statistics.mean(vals), 1) if vals else None
+
+
+def steadiness(week_entries, all_entries):
+    """今週の便のうち、5週間の標準（便ごと代表値の中央値）以上だった便の数。"""
+    pool = [v for e in all_entries for v in e["vals"]]
+    now = [v for e in week_entries for v in e["vals"]]
+    if len(pool) < 4 or not now:
+        return None, len(now)
+    std = statistics.median(pool)
+    return sum(v >= std for v in now), len(now)
 
 
 def blur(base, d):
@@ -176,7 +194,7 @@ def main():
             for k, e in now.items():
                 fish[k]["ships"].append({
                     "name": s["name"], "url": s["url"],
-                    "avg": round(statistics.mean(e["vals"]), 1) if e["vals"] else None,
+                    "avg": round(ship_week(e), 1) if e["vals"] else None,
                     "top": e["top"] or None, "reports": len(e["days"]),
                 })
                 fish[k]["comments"] += [f"[{s['name']}] {c}" for c in e["comments"][:4]]
@@ -193,6 +211,7 @@ def main():
             if now_v is None:
                 continue
             reports = sum(len(e["days"]) for e in nowl)
+            good, total = steadiness(nowl, [e for wk in f["wk"] for e in wk])
             recent3 = [v for v in series[:3] if v is not None]
             avg3 = round(statistics.mean(recent3), 1) if recent3 else None
             rows.append({
@@ -205,6 +224,7 @@ def main():
                 "wow": round(now_v / prev_v - 1, 2) if prev_v else None,
                 "yoy": round(now_v / ly_v - 1, 2) if ly_v else None,
                 "avg3": avg3,
+                "steady_good": good, "steady_total": total,
                 "yoy3": round(avg3 / ly_v - 1, 2) if (ly_v and avg3) else None,
                 "ships": len(f["ships"]), "reports": reports,
                 "ship_list": sorted(f["ships"], key=lambda x: -(x["avg"] or 0)),
@@ -224,7 +244,8 @@ def main():
             ser = " → ".join("—" if v is None else f"{v:g}" for v in r["series"])
             mark = " ※本人が最近釣行済み（picks から外す）" if r["recent_trip"] else ""
             digest.append(f"\n### {r['fish']}  平均{r['avg']}{r['unit']} 竿頭{r['top']:g} / 前週比{pct(r['wow'])} 前年比{pct(r['yoy'])} / {r['ships']}軒 {r['reports']}便{mark}\n")
-            digest.append(f"週ごとの推移（古→新）: {ser} / 直近3週平均 {r['avg3']}（前年比 {pct(r['yoy3'])}）\n")
+            stab = f" / 安定度: 今週{r['steady_total']}便中{r['steady_good']}便が5週の標準以上" if r["steady_good"] is not None else ""
+            digest.append(f"週ごとの推移（古→新）: {ser} / 直近3週平均 {r['avg3']}（前年比 {pct(r['yoy3'])}）{stab}\n")
             digest += [f"- {c}\n" for c in r["comments"]]
 
     out = ROOT / "data" / "summary" / f"{date}.json"
