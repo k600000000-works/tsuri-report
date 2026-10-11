@@ -28,6 +28,8 @@ STATUS = {  # status -> (ラベル, CSSクラス, 並び順)
 
 # 地図: 中心(lat, lng), ズーム, 港の印
 GEO = {
+    "羽田": {"sub": "羽田・平和島・品川・川崎", "c": [35.565, 139.75], "z": 11,
+           "m": [["羽田", 35.550, 139.752], ["平和島", 35.583, 139.742], ["品川", 35.600, 139.748], ["川崎", 35.533, 139.728]]},
     "横浜・金沢八景": {"sub": "本牧・新山下・根岸・金沢八景", "c": [35.385, 139.655], "z": 11,
                  "m": [["本牧", 35.414, 139.676], ["新山下", 35.437, 139.655], ["金沢八景", 35.335, 139.628]]},
     "東京湾口": {"sub": "走水・鴨居・久里浜・金田・松輪・剣崎", "c": [35.20, 139.70], "z": 10,
@@ -131,7 +133,7 @@ def fish_rows(g, notes, weeks=()):
         size = f'・最大{r["size_max"]:g}{r["size_unit"]}' if r.get("size_max") and r.get("size_unit") else ""
         ships = "".join(
             f'<li><a href="{E(s["url"])}" target="_blank" rel="noopener"><span class="s-name">{E(s["name"])}</span>'
-            f'<span class="s-num">平均 {num(s["avg"])}・竿頭 {num(s["top"])}<small>（{s["reports"]}便）</small></span><span class="s-go">›</span></a></li>'
+            f'<span class="s-num">目安 {num(s["avg"])}・竿頭 {num(s["top"])}<small>（{s["reports"]}便）</small></span><span class="s-go">›</span></a></li>'
             for s in r.get("ship_list", []))
         out.append(f"""
       <details class="row{' is-hot' if hot else ''}{' minor' if r['minor'] else ''}">
@@ -141,7 +143,7 @@ def fish_rows(g, notes, weeks=()):
             <div class="r-name">{E(r['fish'])}{badge}</div>
             <div class="r-trend">前週 {pct(r['wow'])}<span class="sep"></span>前年 {pct(r['yoy'])}</div>
           </div>
-          <div class="r-num"><b>{num(r['avg'])}</b><small>{E(r['unit'])}</small><span class="r-top">竿頭 {num(r['top'])}{size}</span></div>
+          <div class="r-num"><span class="r-lab">1人あたり目安</span><b>{num(r['avg'])}</b><small>{E(r['unit'])}</small><span class="r-top">竿頭 {num(r['top'])}{size}</span></div>
           <div class="r-spark">{spark(r.get('series', []), hot)}<span>{len(r.get('series', []))}週推移</span></div>
           {chips(n)}
           {f'<p class="r-note">{E(n["note"])}</p>' if n.get('note') else ''}
@@ -231,6 +233,7 @@ def build(summary, picks, issue_no=1):
       <div class="map map-overview" data-overview='{E(overview)}'></div>
       <nav class="toc">{toc}</nav>
       <a class="to-fish" href="#by-fish">魚種別に、好調な港を見る <span>›</span></a>
+      <a class="to-howto" href="#howto">数値の見方・算出方法 ›</a>
       <p class="hint">横にスワイプすると、魚種別・エリア別のページに進みます</p>
     </div>
     <div class="mast-ghost" aria-hidden="true">{OCTO}</div>
@@ -267,15 +270,55 @@ def build(summary, picks, issue_no=1):
       <div class="map" data-map='{E(mapdata)}'></div></header>
     <div class="wrap">
       {f'<div class="sec-title">概況</div><p class="g-summary">{E(n["summary"])}</p>' if n.get("summary") else ''}
-      <div class="sec-title">魚種別の釣果 <small>タップで船宿ごとの釣果へ</small></div>
+      <div class="sec-title">魚種別の釣果 <small><a href="#howto" class="howto-link">数値の見方 ›</a></small></div>
       <div class="rows">{fish_rows(g, n, weeks_old_first)}</div>
-      <p class="legend">数値は1人あたりの釣果の目安です。便ごとに「竿頭とスソの中間」を出し、船宿ごとに週の中央値を取って、船宿間で平均しています（5軒以上なら最高・最低の1軒ずつを除く）。1日だけの大釣りや不調に左右されにくい値です。「標準以上」は、今週の便のうち、ここ5週の標準を上回った便の数。棒グラフは週ごとの推移（右端が今週）。</p>
+      <p class="legend"><a href="#howto" class="howto-link">数値の見方・算出方法 ›</a><br>大きな数字は「1人あたり目安」。①便ごとに、スソ（最少）と竿頭（最多）の真ん中を出す（例: 20〜115匹 → 67.5匹）②船宿ごとに、その週の便の中央値を取る ③船宿間で平均する（5軒以上なら最高・最低の1軒ずつを除く）。1日だけの大釣りや不調に左右されにくい値です。「標準以上」は、今週の便のうち、ここ5週の標準を上回った便の数。棒グラフは週ごとの推移（右端が今週）。</p>
       <details class="sources"><summary>出典の釣船屋（{len(g['sources'])}軒）</summary><ul class="ships">{src or '<li>なし</li>'}</ul></details>
     </div>
   </section>""")
 
+    slides.append(HOWTO)
     return (TEMPLATE.replace("{{TITLE}}", f"たこ部屋週報 第{issue_no}号（{base.month}/{base.day}）")
             .replace("{{SLIDES}}", "".join(slides)).replace("{{FISH_CSS}}", FISH_CSS))
+
+
+HOWTO = """
+  <section class="slide page" id="howto">
+    <header class="band"><div class="band-in"><a class="back" href="#top">‹ 表紙</a><h2>数値の見方</h2><p>このレポートの数字の出し方と、表示の意味です。</p></div></header>
+    <div class="wrap howto">
+      <div class="sec-title">1人あたり目安</div>
+      <p>エリアごと・魚種ごとの大きな数字です。その週、そのエリアで「ふつうの日に、ふつうの人が釣れた数」の目安を表します。次の3段階で出しています。</p>
+      <ol>
+        <li><b>便ごとの値</b>：船宿が公表する「スソ（最少）〜竿頭（最多）」の真ん中を取ります。<br><span class="eg">例: 20〜115匹 → (20＋115)÷2 ＝ 67.5匹</span></li>
+        <li><b>船宿ごとの週の値</b>：その船宿の、その週の便の値の<b>中央値</b>を取ります。1日だけの大釣りや不調に左右されにくくするためです。</li>
+        <li><b>エリアの値</b>：船宿ごとの値を船宿間で平均します。5軒以上あるときは、最も高い船宿と最も低い船宿を1軒ずつ除きます。船中の合計を1人分の欄に書いたような極端な値も除きます。</li>
+      </ol>
+      <p class="note">竿頭は突出しやすいため、スソと竿頭の真ん中は、実際の「船中の平均的な人」より少し高めに出る傾向があります。あくまで比較のための目安としてご覧ください。</p>
+
+      <div class="sec-title">そのほかの表示</div>
+      <dl>
+        <dt>竿頭</dt><dd>その週にエリア内で報告された最多の数（参考値）。判定には使っていません。</dd>
+        <dt>前週</dt><dd>1人あたり目安の、前の週との比較。</dd>
+        <dt>前年</dt><dd>前年の同じ時期（前後1週間）の1人あたり目安との比較。</dd>
+        <dt>標準以上 ○/○便</dt><dd>今週の便のうち、その魚のここ5週の標準（便ごとの値の中央値）を上回った便の数。多いほど、日によるムラが少なく安定しています。</dd>
+        <dt>棒グラフ・折れ線</dt><dd>週ごとの1人あたり目安の推移（右端が今週）。点線は前年同期の水準です。</dd>
+        <dt>○軒・○便</dt><dd>今週その魚の釣果を報告した船宿の数と、便の数。2便未満のものは「参考値」として薄く表示しています。</dd>
+      </dl>
+
+      <div class="sec-title">状態の見方</div>
+      <dl class="status-dl">
+        <dt><span class="badge hot">狙い目</span></dt><dd>複数の船宿・複数の日で好調が裏付けられ、今週とくに勧められるもの。</dd>
+        <dt><span class="badge up">上向き</span></dt><dd>調子が上がってきているもの。</dd>
+        <dt><span class="badge steady">安定</span></dt><dd>例年並み・平常の釣果。</dd>
+        <dt><span class="badge wait">海況待ち</span></dt><dd>地力はあるものの、今週はウネリや潮で数が落ちたもの。海が落ち着けば戻る見込み。</dd>
+        <dt><span class="badge down">下降</span></dt><dd>2週以上続けて下がっている、またはシーズン終盤のもの。</dd>
+      </dl>
+      <p>状態は、数字だけでなく、各船宿の釣果コメント・直近3週の傾向・前年との比較を合わせて判断しています。</p>
+
+      <div class="sec-title">データについて</div>
+      <p>各船宿が<a href="https://www.chowari.jp/" target="_blank" rel="noopener">釣割</a>に掲載している釣果を、毎週集計しています。直近5週分と、前年の同じ時期の分を使います。各エリアのページの「出典の釣船屋」から、元の釣果ページを確認できます。</p>
+    </div>
+  </section>"""
 
 
 TEMPLATE = """<!doctype html>
@@ -286,6 +329,13 @@ TEMPLATE = """<!doctype html>
 <title>{{TITLE}}</title>
 <meta property="og:title" content="{{TITLE}}">
 <meta property="og:description" content="関東の船釣り、港別・魚種別の釣果まとめ。毎週金曜更新">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-title" content="たこ部屋週報">
+<meta name="application-name" content="たこ部屋週報">
+<meta name="theme-color" content="#0c2238">
+<meta property="og:image" content="https://k600000000-works.github.io/tsuri-report/icons/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -320,17 +370,17 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .mast-rule{display:flex;align-items:center;gap:12px;color:#c9a96a}
 .mast-rule span{flex:1;height:1px;background:linear-gradient(90deg,transparent,#c9a96a)}
 .mast-rule span:last-child{background:linear-gradient(90deg,#c9a96a,transparent)}
-.mast-emblem{width:38px;height:38px;border:1.5px solid #c9a96a;border-radius:50%;display:flex;align-items:center;justify-content:center}
-.mast-emblem svg{width:24px;height:24px}
-.mast-emblem .o-head{fill:none;stroke:#e9d5a8;stroke-width:3}.mast-emblem .o-arm{fill:none;stroke:#e9d5a8;stroke-width:3;stroke-linecap:round}.mast-emblem .o-eye{fill:#e9d5a8}
+.mast-emblem{width:42px;height:42px;border:1.5px solid #c9a96a;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.mast-emblem svg{width:28px;height:28px}
+.mast-emblem .o-head{fill:rgba(240,122,100,.28);stroke:#f07a64;stroke-width:3;stroke-linejoin:round}.mast-emblem .o-arm{fill:none;stroke:#f07a64;stroke-width:3;stroke-linecap:round}.mast-emblem .o-eye{fill:#f07a64}
 .mast-title{font-family:"Noto Serif JP",serif;font-weight:700;font-size:44px;letter-spacing:.14em;margin:12px 0 2px;padding-left:.14em;line-height:1.15;
   color:#f6ecd6;text-shadow:0 2px 0 rgba(0,0,0,.25)}
 .mast-sub{font-size:11px;letter-spacing:.32em;color:#c9a96a}.mast-sub b{font-weight:400;margin:0 .6em;letter-spacing:0}
 .mast-double{height:5px;border-top:1px solid rgba(233,213,168,.55);border-bottom:1px solid rgba(233,213,168,.55);margin:14px 0 8px}
 .mast-issue{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#cfe0ea;flex-wrap:wrap}
 .mast-issue span:first-child{font-family:"Noto Serif JP",serif;font-weight:700;color:#f6ecd6}
-.mast-ghost{position:absolute;top:-10px;right:-40px;width:240px;height:240px;opacity:.06;pointer-events:none}
-.mast-ghost svg{width:100%;height:100%}.mast-ghost .o-head{fill:#fff}.mast-ghost .o-arm{fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round}.mast-ghost .o-eye{fill:var(--navy)}
+.mast-ghost{position:absolute;top:-10px;right:-40px;width:240px;height:240px;opacity:.07;pointer-events:none}
+.mast-ghost svg{width:100%;height:100%}.mast-ghost .o-head{fill:#ff7a63}.mast-ghost .o-arm{fill:none;stroke:#ff7a63;stroke-width:4;stroke-linecap:round}.mast-ghost .o-eye{fill:var(--navy)}
 .overall{margin:0;font-size:16px;line-height:1.8;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:14px 16px}
 .picks{display:grid;gap:12px}
 .pick{display:grid;grid-template-columns:76px 1fr;gap:4px 12px;text-decoration:none;background:#fffdf7;color:#1b2530;border-radius:16px;padding:14px 14px 0;border-left:6px solid var(--buoy);box-shadow:0 6px 18px rgba(0,0,0,.25)}
@@ -350,6 +400,15 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .toc a b{font-size:15px}.toc a span{font-size:12px;color:#9fc0d4}
 .to-fish{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:14px 16px;border-radius:12px;background:#eef4f8;color:var(--navy);font-weight:700;text-decoration:none}
 .to-fish span{font-size:22px;line-height:1}
+.to-howto{display:block;text-align:center;margin-top:12px;font-size:13px;color:#8fc3e3}
+.howto-link{color:var(--sea);font-weight:700;text-decoration:none}
+.howto p,.howto li,.howto dd{font-size:14.5px;line-height:1.8}
+.howto ol{padding-left:1.3em}.howto li{margin:6px 0}
+.howto .eg{display:inline-block;margin-top:2px;font-size:13px;color:var(--sub);background:var(--foam);padding:1px 8px;border-radius:6px}
+.howto .note{font-size:13px;color:var(--sub);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.howto dl{margin:0}.howto dt{font-weight:700;margin-top:10px}.howto dd{margin:2px 0 0}
+.howto .status-dl dt{margin-top:12px}
+.howto a{color:var(--sea)}
 .hint{text-align:center;font-size:12px;color:#8fb0c4;margin-top:18px}
 .waves{position:absolute;left:0;right:0;bottom:0;width:100%;height:40px;fill:var(--paper);opacity:.10}
 
@@ -380,6 +439,7 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .sep{width:1px;height:10px;background:var(--line);margin:0 8px}
 .r-num{text-align:right;grid-row:span 2;align-self:center}
 .r-num b{font-size:24px;font-family:"Noto Serif JP",serif}.r-num small{font-size:12px;margin-left:1px}
+.r-lab{display:block;font-size:10px;color:var(--sub);line-height:1.2}
 .r-top{display:block;font-size:11px;color:var(--sub);white-space:nowrap}
 .r-spark{grid-column:1/-1;display:flex;align-items:flex-end;gap:8px;margin-top:6px}
 .r-spark span{font-size:11px;color:var(--sub)}
@@ -487,12 +547,12 @@ def main():
     (ROOT / "index.html").write_text(page, encoding="utf-8")
     arc = ROOT / "archive"
     arc.mkdir(exist_ok=True)
-    (arc / f"{date}.html").write_text(page.replace('href="archive/"', 'href="./"'), encoding="utf-8")
+    (arc / f"{date}.html").write_text(page.replace('href="archive/"', 'href="./"').replace('href="icons/', 'href="../icons/'), encoding="utf-8")
     items = sorted((p.stem for p in arc.glob("20*.html")), reverse=True)
     lis = "".join(f'<li><a href="{d}.html">{d.replace("-", "/")} 号</a></li>' for d in items)
     (arc / "index.html").write_text(
         '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-        '<title>たこ部屋週報 バックナンバー</title><style>body{font-family:"Noto Sans JP",system-ui,sans-serif;max-width:640px;margin:0 auto;padding:24px 16px;'
+        '<title>たこ部屋週報 バックナンバー</title><link rel="apple-touch-icon" href="../icons/apple-touch-icon.png"><link rel="icon" href="../icons/icon-32.png"><style>body{font-family:"Noto Sans JP",system-ui,sans-serif;max-width:640px;margin:0 auto;padding:24px 16px;'
         'background:#f5f2ea;color:#1b2530}@media(prefers-color-scheme:dark){body{background:#0f1a24;color:#e6ecf0}a{color:#8fc3e3}}'
         'h1{font-family:serif}li{margin:10px 0;font-size:17px}</style></head><body><h1>たこ部屋週報 バックナンバー</h1><p><a href="../">最新号へ</a></p>'
         f'<ul>{lis}</ul></body></html>', encoding="utf-8")
