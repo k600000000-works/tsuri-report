@@ -329,11 +329,11 @@ TEMPLATE = """<!doctype html>
 <title>{{TITLE}}</title>
 <meta property="og:title" content="{{TITLE}}">
 <meta property="og:description" content="関東の船釣り、港別・魚種別の釣果まとめ。毎週金曜更新">
-<link rel="apple-touch-icon" sizes="180x180" href="https://k600000000-works.github.io/tsuri-report/icons/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="32x32" href="https://k600000000-works.github.io/tsuri-report/icons/icon-32.png">
-<link rel="icon" type="image/png" sizes="192x192" href="https://k600000000-works.github.io/tsuri-report/icons/icon-192.png">
-<link rel="icon" type="image/png" sizes="180x180" href="https://k600000000-works.github.io/tsuri-report/icons/apple-touch-icon.png">
-<link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://k600000000-works.github.io/tsuri-report/icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="https://k600000000-works.github.io/tsuri-report/icons/apple-touch-icon.png?v=2">
+<link rel="icon" type="image/png" sizes="32x32" href="https://k600000000-works.github.io/tsuri-report/icons/icon-32.png?v=2">
+<link rel="icon" type="image/png" sizes="192x192" href="https://k600000000-works.github.io/tsuri-report/icons/icon-192.png?v=2">
+<link rel="icon" type="image/png" sizes="180x180" href="https://k600000000-works.github.io/tsuri-report/icons/apple-touch-icon.png?v=2">
+<link rel="apple-touch-icon-precomposed" sizes="180x180" href="https://k600000000-works.github.io/tsuri-report/icons/apple-touch-icon.png?v=2">
 <link rel="manifest" href="https://k600000000-works.github.io/tsuri-report/manifest.webmanifest">
 <meta name="apple-mobile-web-app-title" content="たこ部屋週報">
 <meta name="application-name" content="たこ部屋週報">
@@ -555,7 +555,7 @@ def main():
     lis = "".join(f'<li><a href="{d}.html">{d.replace("-", "/")} 号</a></li>' for d in items)
     (arc / "index.html").write_text(
         '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-        '<title>たこ部屋週報 バックナンバー</title><link rel="apple-touch-icon" href="../icons/apple-touch-icon.png"><link rel="icon" href="../icons/icon-32.png"><style>body{font-family:"Noto Sans JP",system-ui,sans-serif;max-width:640px;margin:0 auto;padding:24px 16px;'
+        '<title>たこ部屋週報 バックナンバー</title><link rel="apple-touch-icon" href="../icons/apple-touch-icon.png?v=2"><link rel="icon" href="../icons/icon-32.png?v=2"><style>body{font-family:"Noto Sans JP",system-ui,sans-serif;max-width:640px;margin:0 auto;padding:24px 16px;'
         'background:#f5f2ea;color:#1b2530}@media(prefers-color-scheme:dark){body{background:#0f1a24;color:#e6ecf0}a{color:#8fc3e3}}'
         'h1{font-family:serif}li{margin:10px 0;font-size:17px}</style></head><body><h1>たこ部屋週報 バックナンバー</h1><p><a href="../">最新号へ</a></p>'
         f'<ul>{lis}</ul></body></html>', encoding="utf-8")
