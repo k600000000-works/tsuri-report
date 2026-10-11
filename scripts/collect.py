@@ -247,6 +247,27 @@ def fetch_uosoku(place, since, until, max_pages=8):
     return out
 
 
+def release_sentences(body, limit=3):
+    """「放流」を含む部分を、前後の文の区切り（句読点・絵文字）までで切り出す。"""
+    def is_break(ch):
+        o = ord(ch)
+        return ch in "。！!？?\n♪☆★" or 0x2600 <= o <= 0x27BF or 0xFE00 <= o <= 0xFE0F or o >= 0x1F000  # 句読点と絵文字だけを区切りにする
+    out = []
+    for m in re.finditer("放流", body):
+        a = m.start()
+        while a > 0 and m.start() - a < 60 and not is_break(body[a - 1]):
+            a -= 1
+        b = m.end()
+        while b < len(body) and b - m.end() < 80 and not is_break(body[b]):
+            b += 1
+        t = body[a:b].strip(" 　")
+        if t and t not in out:
+            out.append(t)
+        if len(out) >= limit:
+            break
+    return out
+
+
 UMC_BASE = "http://xn--nbk4em1stb5747d2j8b.com"  # 海釣りセンター.com（九十九里海釣りセンター）
 UMC_FISH = ["マダイ", "シマアジ", "ショゴ", "ワカシ", "イナダ", "ワラサ", "ブリ", "カンパチ", "ヒラマサ", "ヒラメ", "カレイ", "イシガレイ",
             "イシダイ", "イシガキダイ", "ニザダイ", "クロダイ", "メジナ", "イサキ", "アジ", "サバ", "ソイ", "クロソイ", "アイナメ", "カサゴ",
@@ -273,8 +294,9 @@ def fetch_umc(since, until):
                 rest = rest.replace(f, "　")
         names.sort(key=lambda n: body.find(n) if n in body else 999)
         water = re.search(r"水温\s*([\d.]+)", body)
+        release = release_sentences(body)  # 放流は好調の材料として拾う
         out.append({"date": day, "url": href, "fish": [{"name": n} for n in dict.fromkeys(names)],
-                    "water": float(water.group(1)) if water else None, "comment": body[:400].strip()})
+                    "water": float(water.group(1)) if water else None, "comment": body[:400].strip(), "release": release})
     return out
 
 

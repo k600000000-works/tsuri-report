@@ -231,6 +231,14 @@ def facility_rows(fa, notes, weeks=()):
     return "".join(out) or '<p class="empty">今週は釣果の報告がありませんでした。</p>'
 
 
+def release_box(fa):
+    rel = fa.get("releases") or []
+    if not rel:
+        return ""
+    lis = "".join(f'<li><b>{x["date"][5:].replace("-", "/")}</b>{E(x["text"])}</li>' for x in rel[:6])
+    return f'<div class="release"><div class="release-t">放流情報（直近2週）</div><ul>{lis}</ul></div>'
+
+
 def by_fish(summary, notes):
     """魚種 -> [(港, row, status)]。参考値は除く。"""
     d = {}
@@ -371,6 +379,7 @@ def build(summary, picks, issue_no=1):
       <div class="map" data-map='{E(mapdata)}'></div></header>
     <div class="wrap">
       {f'<div class="sec-title">概況</div><p class="g-summary">{E(n["summary"])}</p>' if n.get("summary") else ''}
+      {release_box(fa)}
       <div class="sec-title">魚種別の釣果 <small><a href="#howto" class="howto-link">数値の見方 ›</a></small></div>
       <div class="rows">{facility_rows(fa, n, weeks_old_first)}</div>
       <p class="legend">{legend}</p>
@@ -515,6 +524,10 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .toc a{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:10px 12px;text-decoration:none;display:flex;flex-direction:column}
 .toc a b{font-size:15px}
 .toc-shore a{padding-left:12px!important}.toc-shore a b{font-size:13.5px}
+.release{margin-top:16px;background:var(--buoy-bg);border:2px solid var(--buoy);border-radius:14px;padding:10px 14px}
+.release-t{font-weight:700;color:var(--buoy);font-size:14px;margin-bottom:4px}
+.release ul{margin:0;padding-left:0;list-style:none}.release li{font-size:13.5px;line-height:1.65;margin:5px 0}
+.release li b{display:inline-block;min-width:3.2em;color:var(--buoy);margin-right:4px}
 .band-shore{background:linear-gradient(160deg,#1d4a5e,#123044)}
 .kind{font-size:11px;letter-spacing:.2em;color:#9fd3c7;margin-top:6px}
 .s-plain{color:var(--ink)!important;font-weight:700}

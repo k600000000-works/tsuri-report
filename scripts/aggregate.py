@@ -234,7 +234,10 @@ def agg_facility(f, weeks, trips):
         rows.sort(key=lambda r: (r["minor"], -r["days"]))
     comments = [f"{it['date'][5:]}{('・' + it['facility']) if it.get('facility') else ''} {it.get('comment') or it.get('title', '')}"[:200]
                 for it in sorted(items, key=lambda x: x["date"], reverse=True) if inwk(it, weeks[0])][:12]
-    return {"name": f["name"], "kind": f.get("kind"), "sub": f.get("sub", ""), "url": f.get("url", ""),
+    releases = [{"date": it["date"], "text": t, "url": it.get("url", "")}
+                for it in sorted(items, key=lambda x: x["date"], reverse=True)
+                if weeks[min(1, len(weeks) - 1)][0] <= it["date"] <= weeks[0][1] for t in it.get("release", [])]  # 直近2週の放流
+    return {"name": f["name"], "kind": f.get("kind"), "sub": f.get("sub", ""), "url": f.get("url", ""), "releases": releases,
             "visitors": visitors[0], "report_days": len(report_days[0]), "fish": rows, "comments": comments,
             "water": [it.get("water") for it in items if inwk(it, weeks[0]) and it.get("water")][:1]}
 
@@ -350,6 +353,8 @@ def main():
             else:
                 ser = " → ".join(str(v) for v in r["days_series"])
                 digest.append(f"- {r['fish']}: {r['days']}/{r['report_days']}日で報告 / 日数の推移 {ser}{mark}\n")
+        if fa.get("releases"):
+            digest.append("放流情報（直近2週。好調の材料として扱う）:\n" + "".join(f"  - {x['date'][5:]} {x['text']}\n" for x in fa["releases"]))
         digest.append("コメント・投稿:\n" + "".join(f"  - {c}\n" for c in fa["comments"]))
 
     out = ROOT / "data" / "summary" / f"{date}.json"
