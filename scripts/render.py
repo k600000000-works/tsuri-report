@@ -151,7 +151,7 @@ def fish_rows(g, notes, weeks=()):
             f'<span class="s-num">{rng(s.get("lo"), s.get("hi"), r["unit"], big=False)}・目安 {num(s["avg"])}<small>（{s["reports"]}便）</small></span><span class="s-go">›</span></a></li>'
             for s in r.get("ship_list", []))
         out.append(f"""
-      <details class="row{' is-hot' if hot else ''}{' minor' if r['minor'] else ''}">
+      <details class="row{' is-hot' if hot else ''}{' minor' if r['minor'] else ''}" id="f-{E(g['name'])}-{E(r['fish'])}">
         <summary>
           <div class="r-icon">{icon(r['fish'])}</div>
           <div class="r-main">
@@ -205,7 +205,7 @@ def build(summary, picks, issue_no=1):
     for p in picks.get("picks", []):
         n = notes.get(p["group"], {}).get("fish", {}).get(p["fish"], {})
         cards.append(f"""
-        <a class="pick" href="#g-{E(p['group'])}">
+        <a class="pick" href="#f-{E(p['group'])}-{E(p['fish'])}">
           <div class="pick-icon">{icon(p['fish'])}</div>
           <div class="pick-body">
             <div class="pick-where">{E(p['group'])}</div>
@@ -222,7 +222,7 @@ def build(summary, picks, issue_no=1):
         for i, g in enumerate(summary["groups"], 1))
     ex = picks.get("excluded", [])
     excluded = ("<div class=\"excluded\"><div class=\"ex-title\">好調ですが、今回は候補から外したもの</div><ul>"
-                + "".join(f'<li><a href="#g-{E(x["group"])}"><b>{E(x["group"])}の{E(x["fish"])}</b></a>　{E(x.get("text", ""))}</li>' for x in ex)
+                + "".join(f'<li><a href="#f-{E(x["group"])}-{E(x["fish"])}"><b>{E(x["group"])}の{E(x["fish"])}</b></a>　{E(x.get("text", ""))}</li>' for x in ex)
                 + "</ul></div>") if ex else ""
     lg = picks.get("log", [])
     log = ('<div class="sec-title">釣行メモ</div><ul class="log">'
@@ -263,7 +263,7 @@ def build(summary, picks, issue_no=1):
         def badge(s):
             return f'<span class="badge {STATUS[s][1]}">{STATUS[s][0]}</span>' if s in STATUS else ""
         items = "".join(
-            f'<a class="fp{" fp-hot" if s == "hot" else ""}" href="#g-{E(gname)}"><span class="fp-port">{E(gname)}</span>'
+            f'<a class="fp{" fp-hot" if s == "hot" else ""}" href="#f-{E(gname)}-{E(fish)}"><span class="fp-port">{E(gname)}</span>'
             f'<span class="fp-num">{rng(r.get("lo_typ"), r.get("hi_typ"), r["unit"], big=False)}</span>{badge(s)}<span class="fp-go">›</span></a>'
             for gname, r, s in lst)
         fish_cards.append(f'<div class="fcard"><div class="fcard-head"><div class="r-icon">{icon(fish)}</div><h3>{E(fish)}</h3></div>{items}</div>')
@@ -464,6 +464,8 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .row>summary::-webkit-details-marker{display:none}
 .row.is-hot{border:2px solid var(--buoy);background:var(--buoy-bg)}
 .row.minor{opacity:.65}
+.row.flash{animation:flash 1.8s ease-out 1}
+@keyframes flash{0%,25%{box-shadow:0 0 0 3px var(--buoy)}100%{box-shadow:0 0 0 0 transparent}}
 .r-icon{width:52px;height:28px;align-self:center;grid-row:span 2}
 .r-name{font-weight:700;font-size:17px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .r-trend{font-size:12px;color:var(--sub);display:flex;align-items:center;white-space:nowrap}
@@ -540,7 +542,9 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
   document.addEventListener('keydown',function(e){if(e.key==='ArrowRight')deck.scrollBy({left:deck.clientWidth});if(e.key==='ArrowLeft')deck.scrollBy({left:-deck.clientWidth});});
   // ページ移動: アニメーションなしで切り替え、履歴を残す（ブラウザの「戻る」で直前のページへ）
   function jump(id){var t=document.getElementById(id);if(!t)return false;
-    if(!t.classList.contains('slide')){var sl=t.closest('.slide');jump(sl.id);sl.scrollTop=t.offsetTop-12;return true;}
+    if(!t.classList.contains('slide')){var sl=t.closest('.slide');jump(sl.id);
+      if(t.tagName==='DETAILS'){t.open=true;t.classList.remove('flash');void t.offsetWidth;t.classList.add('flash');}
+      sl.scrollTop=t.offsetTop-(t.tagName==='DETAILS'?70:12);return true;}
     deck.style.scrollSnapType='none';deck.style.scrollBehavior='auto';deck.scrollLeft=t.offsetLeft;
     requestAnimationFrame(function(){requestAnimationFrame(function(){deck.style.scrollSnapType='';deck.style.scrollBehavior='';});});
     return true;}
@@ -555,7 +559,8 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
   window.addEventListener('popstate',function(e){var id=(e.state&&e.state.id)||decodeURIComponent((location.hash||'#top').slice(1));jump(id);});
   // スワイプで移ったときは、履歴は増やさず現在地だけ更新する
   var swipeT;deck.addEventListener('scroll',function(){clearTimeout(swipeT);swipeT=setTimeout(function(){var id=curId();
-    if(history.state&&history.state.id!==id)history.replaceState({id:id,from:history.state.from},'','#'+id);},250);},{passive:true});
+    var st=history.state&&document.getElementById(history.state.id);var sid=st?(st.classList.contains('slide')?st.id:st.closest('.slide').id):null;
+    if(sid!==id)history.replaceState({id:id,from:history.state&&history.state.from},'','#'+id);},250);},{passive:true});
   if(location.hash){jump(decodeURIComponent(location.hash.slice(1)));}
   document.addEventListener('click',function(e){var c=e.target.closest('[data-cap]');if(!c)return;
     var f=c.closest('.lc');f.querySelector('.lc-cap').textContent=c.dataset.cap;
