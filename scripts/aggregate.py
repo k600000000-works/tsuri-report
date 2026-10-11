@@ -90,19 +90,54 @@ def group_value(per_ship):
     return round(statistics.mean(vals), 1) if vals else None
 
 
+def blur(base, d):
+    """日付を、誰が見ても問題ない程度にぼかした言い方にする。"""
+    days = (base - d).days
+    if days <= 14:
+        return "最近"
+    if days <= 45:
+        return "先月" if d.month != base.month else "今月"
+    if days <= 300:
+        return f"{d.month}月ごろ" if d.year == base.year else f"昨年の{d.month}月ごろ"
+    years = base.year - d.year
+    try:
+        same_season = abs((d.replace(year=base.year) - base).days) <= 45
+    except ValueError:
+        same_season = False
+    ago = "去年" if years == 1 else f"{years}年前"
+    return f"{ago}の今ごろ" if same_season else f"{ago}の{d.month}月ごろ"
+
+
 def load_trips(base):
-    """config/trips.json から、基準日の4週間以内に行った魚種を返す。"""
+    """config/trips.json（非公開）を読む。secret（隠・秘）は最初から除く。
+
+    戻り値: (recent, season, last)
+      recent … 4週間以内に行った魚種 -> True（狙い目から外す）
+      season … 過去の年の同じ時期（前後3週間）の釣行
+      last   … 魚種ごとの直近の釣行
+    """
     p = ROOT / "config" / "trips.json"
     if not p.exists():
-        return {}
-    lo = (base - dt.timedelta(days=RECENT_DAYS)).isoformat()
-    out = {}
-    for t in json.loads(p.read_text(encoding="utf-8")).get("trips", []):
-        if lo <= t["date"] <= base.isoformat():
-            k = norm(t["fish"])
-            if t["date"] > out.get(k, ""):
-                out[k] = t["date"]
-    return out
+        return {}, [], {}
+    trips = [t for t in json.loads(p.read_text(encoding="utf-8")).get("trips", []) if not t.get("secret") and t.get("fish")]
+    recent, season, last = {}, [], {}
+    for t in sorted(trips, key=lambda t: t["date"]):
+        d = dt.date.fromisoformat(t["date"])
+        if d > base:
+            continue
+        k = norm(t["fish"])
+        item = {"fish": k, "when": blur(base, d), "where": t.get("area") or t.get("kind", ""), "kind": t.get("kind", ""), "self": t.get("self", "")}
+        if (base - d).days <= RECENT_DAYS:
+            recent[k] = True
+        if d.year < base.year:
+            try:
+                same = abs((d.replace(year=base.year) - base).days) <= 21
+            except ValueError:
+                same = False
+            if same:
+                season.append(item)
+        last[k] = item
+    return recent, season, last
 
 
 def main():
@@ -114,14 +149,17 @@ def main():
              for i in range(WEEKS)]
     weeks = [w for w in weeks if w[1] >= raw["since"]]
     ly_lo, ly_hi = raw["lastyear"]
-    trips = load_trips(base)
+    trips, season, last = load_trips(base)
 
     summary = {"base_date": raw["base_date"], "week": list(weeks[0]), "weeks": [list(w) for w in weeks],
-               "lastyear": raw["lastyear"], "recent_trips": trips, "groups": []}
+               "lastyear": raw["lastyear"], "groups": []}
     digest = [f"# 判定用ダイジェスト {raw['base_date']}（今週 {weeks[0][0]}〜 / 推移は古い週→今週 / 前年 {ly_lo}〜{ly_hi}）\n"]
-    if trips:
-        digest.append("\n**本人が4週間以内に行った魚種（狙い目 picks から外す・公開物には書かない）**: "
-                      + "、".join(f"{k}（{v}）" for k, v in trips.items()) + "\n")
+    fmt = lambda t: f"{t['when']}・{t['where']}で{t['fish']}" + (f"（{t['self']}）" if t["self"] else "")
+    digest.append("\n## 本人の釣行（ぼかし済み。公開物に書くときもこの粒度まで。日付・船宿名・同行者は書かない）\n")
+    digest.append("- 4週間以内に行った魚種（狙い目 picks から外し、外したことを excluded に書く）: "
+                  + ("、".join(trips) or "なし") + "\n")
+    digest.append("- 過去の同じ時期の釣行: " + ("、".join(fmt(t) for t in season) or "なし") + "\n")
+    digest.append("- 魚種ごとの直近の釣行: " + "、".join(fmt(t) for t in last.values()) + "\n")
 
     for g in raw["groups"]:
         fish = defaultdict(lambda: {"wk": [[] for _ in weeks], "ly": [], "ships": [], "comments": []})
@@ -167,7 +205,7 @@ def main():
                 "ships": len(f["ships"]), "reports": reports,
                 "ship_list": sorted(f["ships"], key=lambda x: -(x["avg"] or 0)),
                 "minor": reports < MIN_REPORTS,
-                "recent_trip": trips.get(k),
+                "recent_trip": bool(trips.get(k)),
                 "comments": f["comments"][:12],
             })
         rows.sort(key=lambda r: (r["minor"], -r["reports"]))
@@ -180,7 +218,7 @@ def main():
                 continue
             pct = lambda x: "—" if x is None else f"{x:+.0%}"
             ser = " → ".join("—" if v is None else f"{v:g}" for v in r["series"])
-            mark = f" ※本人が{r['recent_trip']}に釣行済み" if r["recent_trip"] else ""
+            mark = " ※本人が最近釣行済み（picks から外す）" if r["recent_trip"] else ""
             digest.append(f"\n### {r['fish']}  平均{r['avg']}{r['unit']} 竿頭{r['top']:g} / 前週比{pct(r['wow'])} 前年比{pct(r['yoy'])} / {r['ships']}軒 {r['reports']}便{mark}\n")
             digest.append(f"週ごとの推移（古→新）: {ser}\n")
             digest += [f"- {c}\n" for c in r["comments"]]

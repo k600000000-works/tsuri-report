@@ -158,6 +158,13 @@ def build(summary, picks):
     toc = "".join(
         f'<a href="#g-{E(g["name"])}"><i class="num-pin">{i}</i><b>{E(g["name"])}</b><span>{len([r for r in g["fish"] if not r["minor"]])}魚種 ›</span></a>'
         for i, g in enumerate(summary["groups"], 1))
+    ex = picks.get("excluded", [])
+    excluded = ("<div class=\"excluded\"><div class=\"ex-title\">好調ですが、今回は候補から外したもの</div><ul>"
+                + "".join(f'<li><a href="#g-{E(x["group"])}"><b>{E(x["group"])}の{E(x["fish"])}</b></a>　{E(x.get("text", ""))}</li>' for x in ex)
+                + "</ul></div>") if ex else ""
+    lg = picks.get("log", [])
+    log = ('<div class="sec-title">釣行メモ</div><ul class="log">'
+           + "".join(f'<li>{E(x)}</li>' for x in lg) + "</ul>") if lg else ""
     overview = json.dumps([[g["name"], *GEO[g["name"]]["c"]] for g in summary["groups"] if g["name"] in GEO], ensure_ascii=False)
     slides.append(f"""
   <section class="slide cover" id="top">
@@ -169,6 +176,8 @@ def build(summary, picks):
       <p class="overall">{E(picks.get('headline', '今週の総評はありません。'))}</p>
       <div class="sec-title">今週の狙い目</div>
       <div class="picks">{''.join(cards)}</div>
+      {excluded}
+      {log}
       <div class="sec-title">エリア</div>
       <div class="map map-overview" data-overview='{E(overview)}'></div>
       <nav class="toc">{toc}</nav>
@@ -270,6 +279,10 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .pick-go{grid-column:1/-1;border-top:1px solid #eee5d6;margin-top:6px;padding:9px 0 11px;font-size:13px;font-weight:700;color:var(--sea);display:flex;justify-content:flex-end;align-items:center;gap:6px}
 .pick-go span{font-size:20px;line-height:1}
 .pick:active{transform:scale(.99)}
+.excluded{margin-top:12px;font-size:13px;color:#cfe0ea;background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.22);border-radius:12px;padding:10px 14px}
+.ex-title{font-size:12px;color:#8fc3e3;margin-bottom:4px}
+.excluded ul,.log{margin:0;padding-left:1.1em}.excluded li{margin:3px 0}.excluded a{color:#fff}
+.log{font-size:14px;line-height:1.75;color:#dfeaf1}.log li{margin:4px 0}
 .toc{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .toc a{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:10px 12px;text-decoration:none;display:flex;flex-direction:column}
 .toc a b{font-size:15px}.toc a span{font-size:12px;color:#9fc0d4}
