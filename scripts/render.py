@@ -377,39 +377,75 @@ def sea_rank(x):
     return "good", "良好"
 
 
-def forecast_box(summary, picks):
+FC_ALIAS = {"横浜の海釣り施設": "横浜", "東扇島西公園": "羽田", "九十九里海釣りセンター": "九十九里"}
+
+
+def fc_days_head(fc):
+    wk = "月火水木金土日"
+    return "".join(f'<div class="fc-day">{dt.date.fromisoformat(d).month}/{dt.date.fromisoformat(d).day}（{wk[dt.date.fromisoformat(d).weekday()]}）<span>{fc["tide"][d]}</span></div>' for d in fc["days"])
+
+
+def fc_cells(fc, name):
+    per = fc["areas"].get(name) or fc["areas"].get(FC_ALIAS.get(name, ""), {})
+    cells = []
+    for d in fc["days"]:
+        x = per.get(d) or {}
+        if x.get("wind") is None:
+            cells.append('<div class="fc-cell">—</div>')
+            continue
+        cls, lab = sea_rank(x)
+        wx = WX.get(x.get("code"), "")
+        hm = lambda t: t.lstrip("0") if not t.startswith("00") else "0" + t[2:]
+        hi_t = "・".join(hm(t) for a, t in x.get("tides", []) if a == "満")
+        lo_t = "・".join(hm(t) for a, t in x.get("tides", []) if a == "干")
+        tides = (f"満 {hi_t}" if hi_t else "") + (" / " if hi_t and lo_t else "") + (f"干 {lo_t}" if lo_t else "")
+        period = f'<small>（周期{x["period"]:.0f}秒）</small>' if x.get("period") else ""
+        wave = x.get("wave") if x.get("wave") is not None else "—"
+        cells.append(f'<div class="fc-cell {cls}"><div class="fc-top"><span class="fc-wx">{WX_ICON.get(wx, "")} {wx}</span><span class="fc-rank">{lab}</span></div>'
+                     f'<div class="fc-l">波 <b>{wave}</b>m{period}</div>'
+                     f'<div class="fc-l">風 {E(x.get("wdir", ""))} <b>{x["wind"]:.0f}</b>m/s<small>（突風{x["gust"]:.0f}）</small></div>'
+                     f'<div class="fc-l fc-tide">{tides}</div><div class="fc-rain">降水 {x.get("rain", "—")}%</div></div>')
+    return "".join(cells)
+
+
+FC_SRC = '<p class="fc-src">予報: Open-Meteo（各エリアの沖合の地点）。潮回りは月齢から、満潮・干潮は予報潮位から計算した目安です。出船の可否は必ず船宿にご確認ください。</p>'
+
+
+def forecast_link(summary):
     fc = summary.get("forecast")
     if not fc or not fc.get("areas"):
         return ""
     wk = "月火水木金土日"
-    heads = "".join(f'<div class="fc-day">{dt.date.fromisoformat(d).month}/{dt.date.fromisoformat(d).day}（{wk[dt.date.fromisoformat(d).weekday()]}）<span>{fc["tide"][d]}</span></div>' for d in fc["days"])
-    rows = []
-    for name, per in fc["areas"].items():
-        cells = []
-        for d in fc["days"]:
-            x = per.get(d) or {}
-            cls, lab = sea_rank(x)
-            wx = WX.get(x.get("code"), "")
-            hm = lambda t: t.lstrip("0") if not t.startswith("00") else "0" + t[2:]
-            hi_t = "・".join(hm(t) for a, t in x.get("tides", []) if a == "満")
-            lo_t = "・".join(hm(t) for a, t in x.get("tides", []) if a == "干")
-            tides = (f"満 {hi_t}" if hi_t else "") + (" / " if hi_t and lo_t else "") + (f"干 {lo_t}" if lo_t else "")
-            cells.append(f'<div class="fc-cell {cls}"><div class="fc-top"><span class="fc-wx">{WX_ICON.get(wx, "")} {wx}</span><span class="fc-rank">{lab}</span></div>'
-                         f'<div class="fc-l">波 <b>{x.get("wave") if x.get("wave") is not None else "—"}</b>m'
-                         f'{f"<small>（周期{x.get(chr(112)+chr(101)+chr(114)+chr(105)+chr(111)+chr(100)):.0f}秒）</small>" if x.get("period") else ""}</div>'
-                         f'<div class="fc-l">風 {E(x.get("wdir", ""))} <b>{x.get("wind"):.0f}</b>m/s<small>（突風{x.get("gust"):.0f}）</small></div>'
-                         f'<div class="fc-l fc-tide">{tides}</div><div class="fc-rain">降水 {x.get("rain", "—")}%</div></div>'
-                         if x.get("wind") is not None else '<div class="fc-cell">—</div>')
-        rows.append(f'<div class="fc-row"><div class="fc-name">{E(name)}</div>{"".join(cells)}</div>')
+    ds = "・".join(f'{dt.date.fromisoformat(d).month}/{dt.date.fromisoformat(d).day}{wk[dt.date.fromisoformat(d).weekday()]}' for d in fc["days"])
+    return f'<a class="to-fc" href="#forecast"><span class="to-fc-t">🌊 週末の海況</span><span class="to-fc-d">{ds}・風／潮／波高／天気</span><span class="to-fc-go">›</span></a>'
+
+
+def forecast_slide(summary, picks):
+    fc = summary.get("forecast")
+    if not fc or not fc.get("areas"):
+        return ""
+    rows = "".join(f'<div class="fc-row"><div class="fc-name">{E(name)}</div>{fc_cells(fc, name)}</div>' for name in fc["areas"])
     note = picks.get("forecast_note")
     return f"""
-      <section class="forecast">
-        <div class="sec-title">週末の海況</div>
-        {f'<p class="fc-note">{E(note)}</p>' if note else ''}
-        <div class="fc-head"><div></div>{heads}</div>
-        <div class="fc-rows">{''.join(rows)}</div>
-        <p class="fc-src">予報: Open-Meteo（各エリアの沖合の地点）。潮回りは月齢から、満潮・干潮は予報潮位から計算した目安です。出船の可否は必ず船宿にご確認ください。</p>
-      </section>"""
+  <section class="slide page" id="forecast">
+    <header class="band"><div class="band-in"><div class="navrow"><a class="back js-back" href="#top">‹ 戻る</a><a class="back" href="#top">TOP</a></div><h2>週末の海況</h2><p>各エリアの沖合の、風・潮・波高・天気の予報です。</p></div></header>
+    <div class="wrap fc-page">
+      {f'<div class="sec-title">要点</div><p class="g-summary">{E(note)}</p>' if note else ''}
+      <div class="fc-head">{'<div></div>'}{fc_days_head(fc)}</div>
+      <div class="fc-rows">{rows}</div>
+      {FC_SRC}
+    </div>
+  </section>"""
+
+
+def area_forecast(summary, name):
+    fc = summary.get("forecast")
+    if not fc or not fc.get("areas"):
+        return ""
+    if name not in fc["areas"] and FC_ALIAS.get(name) not in fc["areas"]:
+        return ""
+    return (f'<div class="sec-title">週末の海況 <small><a href="#forecast" class="howto-link">全エリア ›</a></small></div>'
+            f'<div class="fc-area"><div class="fc-head fc-head2">{fc_days_head(fc)}</div><div class="fc-row fc-row2">{fc_cells(fc, name)}</div></div>')
 
 
 def build(summary, picks, issue_no=1):
@@ -465,7 +501,7 @@ def build(summary, picks, issue_no=1):
       {target_box(summary, picks, notes)}
       <div class="sec-title">全エリア総評</div>
       <p class="overall">{E(picks.get('headline', '今週の総評はありません。'))}</p>
-      {forecast_box(summary, picks)}
+      {forecast_link(summary)}
       <div class="sec-title">今週の狙い目</div>
       <div class="picks">{''.join(cards)}</div>
       {excluded}
@@ -500,6 +536,8 @@ def build(summary, picks, issue_no=1):
     <div class="wrap"><div class="fcards">{''.join(fish_cards)}</div></div>
   </section>""")
 
+    slides.append(forecast_slide(summary, picks))
+
     # ---- エリア ----
     for g in summary["groups"]:
         n = notes.get(g["name"], {})
@@ -512,6 +550,7 @@ def build(summary, picks, issue_no=1):
     <header class="band"><div class="band-in"><div class="navrow"><a class="back js-back" href="#top">‹ 戻る</a><a class="back" href="#top">TOP</a></div><h2>{E(g['name'])}</h2><p>{E(geo.get('sub', ''))}</p></div>
       <div class="map" data-map='{E(mapdata)}'></div></header>
     <div class="wrap">
+      {area_forecast(summary, g['name'])}
       {f'<div class="sec-title">概況</div><p class="g-summary">{E(n["summary"])}</p>' if n.get("summary") else ''}
       <div class="sec-title">魚種別の釣果 <small><a href="#howto" class="howto-link">数値の見方 ›</a></small></div>
       <div class="rows">{fish_rows(g, n, weeks_old_first)}</div>
@@ -533,6 +572,7 @@ def build(summary, picks, issue_no=1):
       <div class="kind">陸っぱり・施設</div><h2>{E(fa['name'])}</h2><p>{E(fa['sub'])}{f"・今週の来場者 {fa['visitors']:,}人" if fa.get('visitors') else ''}</p></div>
       <div class="map" data-map='{E(mapdata)}'></div></header>
     <div class="wrap">
+      {area_forecast(summary, fa['name'])}
       {f'<div class="sec-title">概況</div><p class="g-summary">{E(n["summary"])}</p>' if n.get("summary") else ''}
       {release_box(fa)}
       <div class="sec-title">魚種別の釣果 <small><a href="#howto" class="howto-link">数値の見方 ›</a></small></div>
@@ -582,6 +622,9 @@ HOWTO = """
         <dt>来場者100人あたり（横浜の海釣り施設）</dt><dd>施設が毎日公表する魚種ごとの釣れた数（施設全体の合計）を、その週の来場者数の合計で割り、100人あたりにしたもの。混む週末も空いた平日も同じ物差しで比べられます。大黒・磯子・本牧の3施設を合わせています。</dd>
         <dt>今週あがった日（東扇島西公園・九十九里海釣りセンター）</dt><dd>数の公表がない釣り場では、その魚が報告された日数で調子を表しています。東扇島西公園は釣果まとめサイト（ウオスク）に集まる釣具店や釣り人の投稿、九十九里海釣りセンターは施設の毎日の釣果記事が元です。</dd>
       </dl>
+
+      <div class="sec-title">週末の海況</div>
+      <p>その週末（土・日）の、各エリアの沖合の予報です（Open-Meteo）。波高は最大の波の高さ、周期はウネリの周期、風は最大風速と突風です。潮回りは月齢から、満潮・干潮は予報潮位から計算した目安です。<br>出船しやすさの色は、波1m以上か風7m/s以上で「注意」、波1.5m以上か風10m/s以上で「厳しい」としています。出船の可否は船宿が判断します。</p>
 
       <div class="sec-title">状態の見方</div>
       <dl class="status-dl">
@@ -669,6 +712,20 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .pick-where{font-size:12px;font-weight:700;color:var(--buoy);letter-spacing:.06em}
 .pick-fish{font-size:24px;font-weight:700;line-height:1.3}
 .pick-why{margin:4px 0 6px;font-size:14px;line-height:1.65;color:#36424d}
+.to-fc{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;margin-top:16px;padding:12px 16px;border-radius:12px;
+  background:rgba(255,255,255,.08);border:1px solid rgba(143,195,227,.45);text-decoration:none;color:#eef4f8}
+.to-fc-t{font-weight:700;font-size:15px}.to-fc-d{grid-column:1;font-size:12px;color:#a9c6d8}.to-fc-go{grid-row:1/3;grid-column:2;font-size:22px;color:#8fc3e3}
+.fc-page .fc-name,.fc-area .fc-name{color:var(--ink)}
+.fc-page .fc-day,.fc-area .fc-day{color:var(--ink)}.fc-page .fc-day span,.fc-area .fc-day span{color:var(--sea)}
+.fc-page .fc-cell,.fc-area .fc-cell{background:var(--card);border:1px solid var(--line);border-left-width:4px;color:var(--ink)}
+.fc-page .fc-cell.good,.fc-area .fc-cell.good{border-left-color:var(--up)}.fc-page .fc-cell.mid,.fc-area .fc-cell.mid{border-left-color:#d9a21b}
+.fc-page .fc-cell.bad,.fc-area .fc-cell.bad{border-left-color:var(--buoy);background:var(--buoy-bg)}
+.fc-page .fc-rank,.fc-area .fc-rank{background:var(--foam)}
+.fc-page .fc-cell.good .fc-rank,.fc-area .fc-cell.good .fc-rank{color:var(--up)}.fc-page .fc-cell.mid .fc-rank,.fc-area .fc-cell.mid .fc-rank{color:#a57a00}
+.fc-page .fc-cell.bad .fc-rank,.fc-area .fc-cell.bad .fc-rank{color:var(--buoy)}
+.fc-page .fc-l small,.fc-area .fc-l small,.fc-page .fc-tide,.fc-area .fc-tide,.fc-page .fc-rain,.fc-area .fc-rain{color:var(--sub)}
+.fc-page .fc-src{color:var(--sub)}
+.fc-head2,.fc-row2{grid-template-columns:repeat(2,minmax(0,1fr))!important}
 .forecast{margin-top:4px}
 .fc-note{margin:0 0 8px;font-size:14px;line-height:1.75;color:#eef4f8}
 .fc-head,.fc-row{display:grid;grid-template-columns:62px repeat(2,minmax(0,1fr));gap:6px;align-items:stretch}
