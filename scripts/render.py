@@ -260,6 +260,98 @@ OCTO = ('<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M20 30 C16 12 26 4
         'M42 28 C48 38 56 36 58 46" class="o-arm"/><circle cx="27" cy="20" r="2.2" class="o-eye"/><circle cx="37" cy="20" r="2.2" class="o-eye"/></svg>')
 
 
+def find_row(summary, group, fish):
+    """picks の group/fish に対応する集計行を返す。(kind, row)。kind は "ship" / "count" / "days"。"""
+    for g in summary.get("groups", []):
+        if g["name"] == group:
+            for r in g["fish"]:
+                if r["fish"] == fish:
+                    return "ship", r
+    for fa in summary.get("facilities", []):
+        if fa["name"] == group:
+            for r in fa["fish"]:
+                if r["fish"] == fish:
+                    return fa["kind"], r
+    return None, None
+
+
+def pick_stats(summary, group, fish, hot=True):
+    kind, r = find_row(summary, group, fish)
+    if not r:
+        return ""
+    if kind == "ship":
+        big = rng(r.get("lo_typ"), r.get("hi_typ"), r["unit"])
+        sub = f'目安 <b>{num(r["avg"])}</b>{E(r["unit"])}・週最高 {num(r["top"])}'
+        trend = f'前週 {pct(r.get("wow"))}<span class="sep"></span>前年 {pct(r.get("yoy"))}'
+        lab = "スソ〜竿頭"
+        series = r.get("series", [])
+        extra = f'標準以上 {r["steady_good"]}/{r["steady_total"]}便' if r.get("steady_good") is not None else ""
+    elif kind == "count":
+        big = f'<b>{num(r["per100"])}</b><small>匹</small>'
+        sub = f'週計 <b>{r["total"]:,}</b>匹'
+        trend = f'前週 {pct(r.get("wow"))}<span class="sep"></span>前年 {pct(r.get("yoy"))}'
+        lab = "来場者100人あたり"
+        series = r.get("series", [])
+        extra = f'{r["days"]}日で釣果'
+    else:
+        big = f'<b>{r["days"]}</b><small>/{r["report_days"]}日</small>'
+        sub = "今週あがった日"
+        trend = ""
+        lab = "あがった日"
+        series = r.get("days_series", [])
+        extra = ""
+    return (f'<div class="pick-stats"><div class="ps-num"><span class="ps-lab">{lab}</span>{big}</div>'
+            f'<div class="ps-side"><div class="ps-sub">{sub}</div>'
+            f'{f"<div class=ps-trend>{trend}</div>" if trend else ""}'
+            f'<div class="ps-spark">{spark(series, hot)}<span>{E(extra)}</span></div></div></div>')
+
+
+def target_box(summary, picks, notes):
+    out = []
+    for tname in summary.get("targets", []):
+        items = []
+        for g in summary.get("groups", []):
+            for r in g["fish"]:
+                if r["fish"] == tname:
+                    items.append(("ship", g["name"], r))
+        for fa in summary.get("facilities", []):
+            for r in fa["fish"]:
+                if r["fish"] == tname:
+                    items.append((fa["kind"], fa["name"], r))
+        def rank(it):
+            st = notes.get(it[1], {}).get("fish", {}).get(tname, {}).get("status")
+            val = it[2].get("hi_typ") or it[2].get("per100") or it[2].get("days") or 0
+            return (it[2].get("minor", False), STATUS.get(st, ("", "", 2))[2], -val)
+        lis = []
+        for kind, gname, r in sorted(items, key=rank):
+            st = STATUS.get(notes.get(gname, {}).get("fish", {}).get(tname, {}).get("status", ""))
+            badge = f'<span class="badge {st[1]}">{st[0]}</span>' if st else ""
+            if kind == "ship":
+                num_html = f'{rng(r.get("lo_typ"), r.get("hi_typ"), r["unit"])}<span class="tg-mid">目安 {num(r["avg"])}</span>'
+                trend = f'前週 {pct(r.get("wow"))}<span class="sep"></span>前年 {pct(r.get("yoy"))}'
+                ser = r.get("series", [])
+            elif kind == "count":
+                num_html = f'<b>{num(r["per100"])}</b><small>匹/100人</small>'
+                trend = f'前週 {pct(r.get("wow"))}'
+                ser = r.get("series", [])
+            else:
+                num_html = f'<b>{r["days"]}</b><small>/{r["report_days"]}日</small>'
+                trend = "あがった日"
+                ser = r.get("days_series", [])
+            lis.append(f'<a class="tg-row{" minor" if r.get("minor") else ""}" href="#f-{E(gname)}-{E(tname)}">'
+                       f'<div class="tg-where">{E(gname)}{badge}<div class="tg-trend">{trend}</div></div>'
+                       f'<div class="tg-spark">{spark(ser)}</div><div class="tg-num">{num_html}</div><span class="tg-go">›</span></a>')
+        note = picks.get("targets", {}).get(tname, {})
+        note = note.get("summary") if isinstance(note, dict) else note
+        out.append(f"""
+      <section class="target">
+        <div class="tg-head"><div class="tg-icon">{icon(tname)}</div><div><div class="tg-kicker">TARGET</div><h2>ターゲット：{E(tname)}</h2></div></div>
+        {f'<p class="tg-note">{E(note)}</p>' if note else ''}
+        <div class="tg-list">{''.join(lis) or '<p class="empty">今週は報告がありませんでした。</p>'}</div>
+      </section>""")
+    return "".join(out)
+
+
 def build(summary, picks, issue_no=1):
     base = dt.date.fromisoformat(summary["base_date"])
     wk = "月火水木金土日"[base.weekday()]
@@ -282,6 +374,7 @@ def build(summary, picks, issue_no=1):
             <p class="pick-why">{E(p.get('reason', ''))}</p>
             {chips(n)}
           </div>
+          {pick_stats(summary, p['group'], p['fish'])}
           <div class="pick-go">港の詳細 <span>›</span></div>
         </a>""")
     if not cards:
@@ -309,6 +402,7 @@ def build(summary, picks, issue_no=1):
         <div class="mast-issue"><span>第{issue_no}号</span><span>{base.year}年{base.month}月{base.day}日（{wk}）</span><span>集計 {period}</span></div>
       </header>
       <nav class="quick"><a href="#by-fish"><b>魚種別</b><span>好調な港を探す ›</span></a><a href="#areas"><b>エリア別</b><span>港ごとに見る ↓</span></a><a href="#howto"><b>数値の見方</b><span>算出方法 ›</span></a></nav>
+      {target_box(summary, picks, notes)}
       <div class="sec-title">全エリア総評</div>
       <p class="overall">{E(picks.get('headline', '今週の総評はありません。'))}</p>
       <div class="sec-title">今週の狙い目</div>
@@ -513,6 +607,33 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .pick-where{font-size:12px;font-weight:700;color:var(--buoy);letter-spacing:.06em}
 .pick-fish{font-size:24px;font-weight:700;line-height:1.3}
 .pick-why{margin:4px 0 6px;font-size:14px;line-height:1.65;color:#36424d}
+.target{margin-top:18px;background:linear-gradient(160deg,rgba(240,122,100,.16),rgba(255,255,255,.06));border:1.5px solid rgba(240,122,100,.6);border-radius:16px;padding:12px 12px 6px}
+.tg-head{display:flex;align-items:center;gap:10px}
+.tg-icon{width:64px;height:34px}
+.tg-kicker{font-size:10px;letter-spacing:.3em;color:#f3a593}
+.target h2{margin:0;font-size:21px;color:#fbe9dc}
+.tg-note{margin:8px 2px 6px;font-size:14px;line-height:1.75;color:#eef4f8}
+.tg-list{display:grid;gap:6px;margin-top:6px}
+.tg-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto 12px;align-items:center;gap:8px;padding:9px 10px;border-radius:12px;background:rgba(255,255,255,.07);text-decoration:none;color:#eef4f8}
+.tg-row.minor{opacity:.6}
+.tg-where{font-weight:700;font-size:14px;display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+.tg-trend{width:100%;font-weight:400;font-size:11.5px;color:#a9c6d8;display:flex;align-items:center}
+.tg-trend .pos{color:#8fe0b0}.tg-trend .neg{color:#b0bcc4}
+.tg-num{text-align:right;line-height:1.1}.tg-num b{font-family:"Noto Serif JP",serif;font-size:22px;color:#fff}.tg-num small{font-size:11px}
+.tg-num .lo{font-size:12px;color:#a9c6d8}.tg-mid{display:block;font-size:11px;color:#a9c6d8}
+.tg-spark .spark .b{fill:rgba(255,255,255,.3)}.tg-spark .spark .b-now{fill:#f07a64}
+.tg-go{color:#a9c6d8;font-size:18px}
+.pick-stats{grid-column:1/-1;display:flex;align-items:center;gap:14px;margin:4px 0 2px;padding:8px 10px;background:#f6f1e7;border-radius:10px}
+.ps-num{flex:none;line-height:1.1}
+.ps-lab{display:block;font-size:10px;color:#6b7680;margin-bottom:2px}
+.ps-num b{font-family:"Noto Serif JP",serif;font-size:30px;color:#1b2530}
+.ps-num small{font-size:13px;margin-left:1px}
+.ps-num .lo{font-size:14px;color:#6b7680;font-family:"Noto Serif JP",serif}
+.ps-side{flex:1;min-width:0;font-size:12px;color:#36424d}
+.ps-sub b{font-size:15px;font-family:"Noto Serif JP",serif;color:#1b2530}
+.ps-trend{display:flex;align-items:center;flex-wrap:wrap;margin-top:2px}
+.ps-spark{display:flex;align-items:flex-end;gap:6px;margin-top:4px}.ps-spark span{font-size:10.5px;color:#6b7680}
+.pick-stats .spark .b{fill:#c9d5de}.pick-stats .spark .b-now{fill:var(--buoy)}
 .pick-go{grid-column:1/-1;border-top:1px solid #eee5d6;margin-top:6px;padding:9px 0 11px;font-size:13px;font-weight:700;color:var(--sea);display:flex;justify-content:flex-end;align-items:center;gap:6px}
 .pick-go span{font-size:20px;line-height:1}
 .pick:active{transform:scale(.99)}
@@ -548,7 +669,7 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .howto .status-dl dt{margin-top:12px}
 .howto a{color:var(--sea)}
 .hint{text-align:center;font-size:12px;color:#8fb0c4;margin-top:18px}
-.waves{position:absolute;left:0;right:0;bottom:0;width:100%;height:40px;fill:var(--paper);opacity:.10}
+.waves{display:block;width:100%;height:40px;margin-top:8px;fill:var(--paper);opacity:.10}
 
 /* 中ページ */
 .band{background:linear-gradient(160deg,var(--navy2),var(--navy));color:#eef4f8;position:relative}

@@ -360,6 +360,28 @@ def main():
             digest.append("放流情報（直近2週。好調の材料として扱う）:\n" + "".join(f"  - {x['date'][5:]} {x['text']}\n" for x in fa["releases"]))
         digest.append("コメント・投稿:\n" + "".join(f"  - {c}\n" for c in fa["comments"]))
 
+    # ターゲット（本人が狙いを定めた魚種）: 全エリア・全施設の状況を一覧にする
+    tp = ROOT / "config" / "targets.json"
+    targets = json.loads(tp.read_text(encoding="utf-8")).get("targets", []) if tp.exists() else []
+    summary["targets"] = targets
+    if targets:
+        digest.append("\n# ターゲット（本人が狙いを定めた魚種。picks の targets に総評を書く）\n")
+        for tname in targets:
+            k = norm(tname)
+            digest.append(f"\n## {k}\n")
+            for g in summary["groups"]:
+                for r in g["fish"]:
+                    if r["fish"] == k:
+                        pct = lambda x: "—" if x is None else f"{x:+.0%}"
+                        digest.append(f"- {g['name']}: {r['lo_typ']}〜{r['hi_typ']}{r['unit']}（目安{r['avg']}）/ 前週比{pct(r['wow'])} 3週前年比{pct(r['yoy3'])} / 安定度 {r['steady_good']}/{r['steady_total']} / {r['ships']}軒{r['reports']}便\n")
+            for fa in summary["facilities"]:
+                for r in fa["fish"]:
+                    if r["fish"] == k:
+                        if fa["kind"] == "count":
+                            digest.append(f"- {fa['name']}: 100人あたり{r['per100']}匹（週計{r['total']}）\n")
+                        else:
+                            digest.append(f"- {fa['name']}: {r['days']}/{r['report_days']}日で報告\n")
+
     out = ROOT / "data" / "summary" / f"{date}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")

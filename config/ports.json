@@ -235,6 +235,14 @@
      "id": "00007",
      "name": "荒川屋",
      "port": "金沢八景平潟"
+    },
+    {
+     "id": "fv1750",
+     "name": "小柴丸",
+     "port": "柴漁港",
+     "source": "fv",
+     "fv_id": "1750",
+     "url": "https://www.fishing-v.jp/choka/choka_detail.php?s=1750"
     }
    ]
   },
@@ -800,6 +808,14 @@
      "id": "00171",
      "name": "山正丸",
      "port": "大洗港"
+    },
+    {
+     "id": "kamome",
+     "name": "かもめ丸",
+     "port": "那珂湊港",
+     "source": "diary",
+     "diary_url": "http://www.mito.ne.jp/~kamome/cyuka.html",
+     "url": "http://www.mito.ne.jp/~kamome/cyuka.html"
     }
    ]
   },

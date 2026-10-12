@@ -7,6 +7,7 @@
 出力: data/raw/<基準日>.json
 """
 import argparse
+import unicodedata
 import urllib.parse
 import datetime as dt
 import html
@@ -174,6 +175,85 @@ def fetch_blog(base, ship_id, since, until):
         time.sleep(WAIT)
         day += dt.timedelta(days=1)
     return res
+
+
+# ---- 釣りビジョン（釣割に無い船宿用） ----
+FV_BOX_RE = re.compile(r'<div class="choka_box">(.*?)(?=<div class="choka_box">|<div class="pager|\Z)', re.S)
+
+
+def fetch_fv(sid, ship_id, since, until, max_pages=6):
+    """釣りビジョンの船宿ページ（choka_detail.php?s=ID）から日ごとの釣果を取る。"""
+    out = []
+    for page in range(1, max_pages + 1):
+        t = get(f"https://www.fishing-v.jp/choka/choka_detail.php?s={sid}&pageID={page}")
+        time.sleep(WAIT)
+        boxes = FV_BOX_RE.findall(t)
+        if not boxes:
+            break
+        oldest = None
+        for b in boxes:
+            d = re.search(r'<li class="date">(\d{4})年(\d{1,2})月(\d{1,2})日', b)
+            if not d:
+                continue
+            day = f"{int(d.group(1)):04d}-{int(d.group(2)):02d}-{int(d.group(3)):02d}"
+            oldest = day if (oldest is None or day < oldest) else oldest
+            if not (since <= day <= until):
+                continue
+            fish = []
+            for row in re.findall(r"<tr>\s*<td><span class=\"choka_number\">\d+</span></td>(.*?)</tr>", b, re.S):
+                tds = [clean(x) for x in re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)]
+                if len(tds) < 3 or not tds[0]:
+                    continue
+                r, _ = _ranges(tds[1] + " " + tds[2])
+                c, z = r["count"], r["size"]
+                fish.append({"name": tds[0], "size": tds[2], "count": tds[1],
+                             "min": c[0] if c else None, "max": c[1] if c else None, "unit": c[2] if c else "",
+                             "size_max": z[1] if z else None})
+            fish = [f for f in fish if f["min"] is not None]
+            if not fish:
+                continue
+            com = " ".join(clean(x) for x in re.findall(r'<div class="choka_comment">(.*?)</div>', b, re.S))
+            out.append({"ship_id": ship_id, "choka_id": "", "date": day, "tide": "", "fish": fish,
+                        "comment": re.sub(r"^\d+", "", com)[:400]})
+        if oldest and oldest < since:
+            break
+    return out
+
+
+# ---- 船宿の公式サイト（日付と「魚種 ○～○匹 ○～○kg」が並ぶ日記形式。那珂湊かもめ丸など） ----
+def fetch_diary(url, ship_id, since, until):
+    """年の表記がない日記形式。月が基準日より先なら前年とみなす。"""
+    t = get(url)
+    t = re.sub(r"<br\s*/?>", "\n", t)
+    t = re.sub(r"<[^>]+>", "\n", t)
+    t = unicodedata.normalize("NFKC", html.unescape(t))
+    lines = [l.strip() for l in t.split("\n") if l.strip()]
+    base = dt.date.fromisoformat(until)
+    out, cur = [], None
+    for l in lines:
+        m = re.match(r"^(\d{1,2})月(\d{1,2})日", l)
+        if m:
+            mo, da = int(m.group(1)), int(m.group(2))
+            yr = base.year if mo <= base.month else base.year - 1
+            try:
+                cur = {"ship_id": ship_id, "choka_id": "", "date": dt.date(yr, mo, da).isoformat(), "tide": "", "fish": [], "comment": ""}
+            except ValueError:
+                cur = None
+                continue
+            out.append(cur)
+            continue
+        if cur is None:
+            continue
+        f = re.match(r"^([ァ-ヶー一-龠]+)\s*(\d+)\s*[～~-]\s*(\d+)\s*(匹|杯|ハイ|本|枚)(?:\s*([\d.]+)\s*[～~-]\s*([\d.]+)\s*[kK])?", l)
+        if f:
+            unit = "杯" if f.group(4) == "ハイ" else f.group(4)
+            cur["fish"].append({"name": f.group(1), "count": f"{f.group(2)}～{f.group(3)}{unit}",
+                                "size": f"{f.group(5)}～{f.group(6)}kg" if f.group(5) else "",
+                                "min": float(f.group(2)), "max": float(f.group(3)), "unit": unit,
+                                "size_max": float(f.group(6)) if f.group(6) else None})
+        elif len(cur["comment"]) < 300:
+            cur["comment"] = (cur["comment"] + " " + l).strip()
+    return [x for x in out if x["fish"] and since <= x["date"] <= until]
 
 
 # ---- 陸っぱり・施設 ----
@@ -350,7 +430,15 @@ def main():
             if s["id"] in have:
                 ships.append({**have[s["id"]], **s})
                 continue
-            if s.get("source") == "blog":
+            if s.get("source") == "fv":
+                cur = fetch_fv(s["fv_id"], s["id"], since, until)
+                last = fetch_fv(s["fv_id"], s["id"], ly_since, ly_until, max_pages=12) if (cur and not a.no_lastyear) else []
+                url = s.get("url") or f"https://www.fishing-v.jp/choka/choka_detail.php?s={s['fv_id']}"
+            elif s.get("source") == "diary":
+                cur = fetch_diary(s["diary_url"], s["id"], since, until)
+                last = []
+                url = s.get("url") or s["diary_url"]
+            elif s.get("source") == "blog":
                 cur = fetch_blog(s["base"], s["id"], since, until)
                 last = fetch_blog(s["base"], s["id"], ly_since, ly_until) if (cur and not a.no_lastyear) else []
                 url = s.get("url") or f"{s['base']}/category/Choka/"
