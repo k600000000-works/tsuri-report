@@ -256,6 +256,41 @@ def fetch_diary(url, ship_id, since, until):
     return [x for x in out if x["fish"] and since <= x["date"] <= until]
 
 
+# ---- 那珂湊 岡重丸の釣果ページ（最新10件のみ。過去分はさかのぼれない） ----
+def fetch_okaju(url, ship_id, since, until):
+    t = get(url)
+    out = []
+    for blk in re.split(r"<dt>", t)[1:]:
+        txt = unicodedata.normalize("NFKC", clean(re.sub(r"<br\s*/?>", " ", blk)))
+        txt = re.sub(r"(\d)・(\d)", r"\1.\2", txt)  # 0・3 → 0.3
+        post = re.search(r"投稿日\s*:\s*(\d{4})/(\d{1,2})/(\d{1,2})", txt)
+        if not post:
+            continue
+        kind = re.search(r"釣り物\s*[:：]\s*(\S+)\s*(?:(\d{1,2})月(\d{1,2})日)?", txt)
+        res = re.search(r"釣果\s*[:：]\s*(\d+)\s*[～~-]\s*(\d+)\s*(尾|匹|杯|本|枚)\s*(?:([\d.]+)\s*[～~-]\s*([\d.]+)\s*kg)?", txt)
+        if not kind or not res:
+            continue
+        y = int(post.group(1))
+        if kind.group(2):
+            mo, da = int(kind.group(2)), int(kind.group(3))
+            if mo > int(post.group(2)):
+                y -= 1
+        else:
+            mo, da = int(post.group(2)), int(post.group(3))
+        day = dt.date(y, mo, da).isoformat()
+        if not (since <= day <= until):
+            continue
+        unit = "杯" if ("タコ" in kind.group(1) or "ダコ" in kind.group(1)) else ("匹" if res.group(3) == "尾" else res.group(3))
+        tail = re.split(r"水深\s*[:：]\s*\S+", txt)
+        out.append({"ship_id": ship_id, "choka_id": "", "date": day, "tide": "",
+                    "fish": [{"name": kind.group(1), "count": f"{res.group(1)}～{res.group(2)}{unit}",
+                              "size": f"{res.group(4)}～{res.group(5)}kg" if res.group(4) else "",
+                              "min": float(res.group(1)), "max": float(res.group(2)), "unit": unit,
+                              "size_max": float(res.group(5)) if res.group(5) else None}],
+                    "comment": (tail[-1].split("[管理用]")[0].strip() if len(tail) > 1 else "")[:300]})
+    return out
+
+
 # ---- 陸っぱり・施設 ----
 YFP_API = "https://iqqdsybr6beovaix6btxwykuha.appsync-api.ap-northeast-1.amazonaws.com/graphql"
 YFP_KEY = "da2-of4bzmdi4vhjha5buiog37mki4"  # 横浜フィッシングピアーズの公式サイトが閲覧用に公開しているキー
@@ -434,6 +469,10 @@ def main():
                 cur = fetch_fv(s["fv_id"], s["id"], since, until)
                 last = fetch_fv(s["fv_id"], s["id"], ly_since, ly_until, max_pages=12) if (cur and not a.no_lastyear) else []
                 url = s.get("url") or f"https://www.fishing-v.jp/choka/choka_detail.php?s={s['fv_id']}"
+            elif s.get("source") == "okaju":
+                cur = fetch_okaju(s["page_url"], s["id"], since, until)
+                last = []
+                url = s.get("url") or s["page_url"]
             elif s.get("source") == "diary":
                 cur = fetch_diary(s["diary_url"], s["id"], since, until)
                 last = []

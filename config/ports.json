@@ -816,6 +816,14 @@
      "source": "diary",
      "diary_url": "http://www.mito.ne.jp/~kamome/cyuka.html",
      "url": "http://www.mito.ne.jp/~kamome/cyuka.html"
+    },
+    {
+     "id": "okaju",
+     "name": "岡重丸",
+     "port": "那珂湊港",
+     "source": "okaju",
+     "page_url": "http://okajumaru.com/clip/clip.php",
+     "url": "http://okajumaru.com/clip/clip.php"
     }
    ]
   },
