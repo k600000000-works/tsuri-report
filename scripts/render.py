@@ -385,8 +385,18 @@ def fc_days_head(fc):
     return "".join(f'<div class="fc-day">{dt.date.fromisoformat(d).month}/{dt.date.fromisoformat(d).day}（{wk[dt.date.fromisoformat(d).weekday()]}）<span>{fc["tide"][d]}</span></div>' for d in fc["days"])
 
 
+def fc_link(fc, name):
+    """その地点の時間帯別予報（Windy）。"""
+    pt = (fc.get("points") or {}).get(name) or (fc.get("points") or {}).get(FC_ALIAS.get(name, ""))
+    if not pt:
+        return ""
+    la, lo = pt
+    return f"https://www.windy.com/{la:.3f}/{lo:.3f}?waves,{la:.3f},{lo:.3f},10"
+
+
 def fc_cells(fc, name):
     per = fc["areas"].get(name) or fc["areas"].get(FC_ALIAS.get(name, ""), {})
+    link = fc_link(fc, name)
     cells = []
     for d in fc["days"]:
         x = per.get(d) or {}
@@ -401,14 +411,14 @@ def fc_cells(fc, name):
         tides = (f"満 {hi_t}" if hi_t else "") + (" / " if hi_t and lo_t else "") + (f"干 {lo_t}" if lo_t else "")
         period = f'<small>（周期{x["period"]:.0f}秒）</small>' if x.get("period") else ""
         wave = x.get("wave") if x.get("wave") is not None else "—"
-        cells.append(f'<div class="fc-cell {cls}"><div class="fc-top"><span class="fc-wx">{WX_ICON.get(wx, "")} {wx}</span><span class="fc-rank">{lab}</span></div>'
+        cells.append(f'<a class="fc-cell {cls}" href="{E(link)}" target="_blank" rel="noopener"><div class="fc-top"><span class="fc-wx">{WX_ICON.get(wx, "")} {wx}</span><span class="fc-rank">{lab}</span></div>'
                      f'<div class="fc-l">波 <b>{wave}</b>m{period}</div>'
                      f'<div class="fc-l">風 {E(x.get("wdir", ""))} <b>{x["wind"]:.0f}</b>m/s<small>（突風{x["gust"]:.0f}）</small></div>'
-                     f'<div class="fc-l fc-tide">{tides}</div><div class="fc-rain">降水 {x.get("rain", "—")}%</div></div>')
+                     f'<div class="fc-l fc-tide">{tides}</div><div class="fc-rain">降水 {x.get("rain", "—")}%<span class="fc-more">時間別 ›</span></div></a>')
     return "".join(cells)
 
 
-FC_SRC = '<p class="fc-src">予報: Open-Meteo（各エリアの沖合の地点）。潮回りは月齢から、満潮・干潮は予報潮位から計算した目安です。出船の可否は必ず船宿にご確認ください。</p>'
+FC_SRC = '<p class="fc-src">予報: Open-Meteo（各エリアの沖合の地点）。潮回りは月齢から、満潮・干潮は予報潮位から計算した目安です。各日の欄をタップすると、その地点の時間帯別の予報（Windy・外部サイト）が開きます。出船の可否は必ず船宿にご確認ください。</p>'
 
 
 def forecast_link(summary):
@@ -741,6 +751,8 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .fc-l{margin-top:2px;white-space:nowrap}.fc-l b{font-size:14px;font-family:"Noto Serif JP",serif}.fc-l small{font-size:10px;color:#a9c6d8}
 .fc-tide{color:#c9dbe6;font-size:10.5px;white-space:normal;line-height:1.4}.fc-rain{font-size:10.5px;color:#a9c6d8}
 .fc-src{font-size:10.5px;color:#8fb0c4;margin:6px 0 0}
+a.fc-cell{display:block;text-decoration:none}
+.fc-more{float:right;font-weight:700;color:var(--sea)}
 .target{margin-top:18px;background:linear-gradient(160deg,rgba(240,122,100,.16),rgba(255,255,255,.06));border:1.5px solid rgba(240,122,100,.6);border-radius:16px;padding:12px 12px 6px}
 .tg-head{display:flex;align-items:center;gap:10px}
 .tg-icon{width:64px;height:34px}

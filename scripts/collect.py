@@ -457,7 +457,7 @@ def fetch_forecast(base):
     days = weekend_days(base)
     d0, d1 = days[0].isoformat(), days[-1].isoformat()
     out = {"days": [d.isoformat() for d in days], "tide": {d.isoformat(): tide_name(moon_age(d)) for d in days},
-           "moon_age": {d.isoformat(): round(moon_age(d), 1) for d in days}, "areas": {}}
+           "moon_age": {d.isoformat(): round(moon_age(d), 1) for d in days}, "areas": {}, "points": pts}
     for name, (la, lo) in pts.items():
         try:
             m = json.loads(get(f"https://marine-api.open-meteo.com/v1/marine?latitude={la}&longitude={lo}"
