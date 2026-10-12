@@ -362,6 +362,56 @@ def target_box(summary, picks, notes):
     return "".join(out)
 
 
+WX = {0: "晴れ", 1: "晴れ", 2: "晴れ時々曇り", 3: "曇り", 45: "霧", 48: "霧", 51: "小雨", 53: "雨", 55: "雨", 61: "雨", 63: "雨", 65: "大雨",
+      80: "にわか雨", 81: "にわか雨", 82: "強いにわか雨", 95: "雷雨", 96: "雷雨", 99: "雷雨"}
+WX_ICON = {"晴れ": "☀", "晴れ時々曇り": "⛅", "曇り": "☁", "霧": "🌫", "小雨": "🌦", "雨": "☔", "大雨": "☔", "にわか雨": "🌦", "強いにわか雨": "☔", "雷雨": "⛈"}
+
+
+def sea_rank(x):
+    """出船しやすさの目安。波と風から。"""
+    w, v = x.get("wave") or 0, x.get("wind") or 0
+    if w >= 1.5 or v >= 10:
+        return "bad", "厳しい"
+    if w >= 1.0 or v >= 7:
+        return "mid", "注意"
+    return "good", "良好"
+
+
+def forecast_box(summary, picks):
+    fc = summary.get("forecast")
+    if not fc or not fc.get("areas"):
+        return ""
+    wk = "月火水木金土日"
+    heads = "".join(f'<div class="fc-day">{dt.date.fromisoformat(d).month}/{dt.date.fromisoformat(d).day}（{wk[dt.date.fromisoformat(d).weekday()]}）<span>{fc["tide"][d]}</span></div>' for d in fc["days"])
+    rows = []
+    for name, per in fc["areas"].items():
+        cells = []
+        for d in fc["days"]:
+            x = per.get(d) or {}
+            cls, lab = sea_rank(x)
+            wx = WX.get(x.get("code"), "")
+            hm = lambda t: t.lstrip("0") if not t.startswith("00") else "0" + t[2:]
+            hi_t = "・".join(hm(t) for a, t in x.get("tides", []) if a == "満")
+            lo_t = "・".join(hm(t) for a, t in x.get("tides", []) if a == "干")
+            tides = (f"満 {hi_t}" if hi_t else "") + (" / " if hi_t and lo_t else "") + (f"干 {lo_t}" if lo_t else "")
+            cells.append(f'<div class="fc-cell {cls}"><div class="fc-top"><span class="fc-wx">{WX_ICON.get(wx, "")} {wx}</span><span class="fc-rank">{lab}</span></div>'
+                         f'<div class="fc-l">波 <b>{x.get("wave") if x.get("wave") is not None else "—"}</b>m'
+                         f'{f"<small>（周期{x.get(chr(112)+chr(101)+chr(114)+chr(105)+chr(111)+chr(100)):.0f}秒）</small>" if x.get("period") else ""}</div>'
+                         f'<div class="fc-l">風 {E(x.get("wdir", ""))} <b>{x.get("wind"):.0f}</b>m/s<small>（突風{x.get("gust"):.0f}）</small></div>'
+                         f'<div class="fc-l fc-tide">{tides}</div><div class="fc-rain">降水 {x.get("rain", "—")}%</div></div>'
+                         if x.get("wind") is not None else '<div class="fc-cell">—</div>')
+        rows.append(f'<div class="fc-row"><div class="fc-name">{E(name)}</div>{"".join(cells)}</div>')
+    note = picks.get("forecast_note")
+    return f"""
+      <section class="forecast">
+        <div class="sec-title">週末の海況</div>
+        {f'<p class="fc-note">{E(note)}</p>' if note else ''}
+        <div class="fc-head"><div></div>{heads}</div>
+        <div class="fc-rows">{''.join(rows)}</div>
+        <p class="fc-src">予報: Open-Meteo（各エリアの沖合の地点）。潮回りは月齢から、満潮・干潮は予報潮位から計算した目安です。出船の可否は必ず船宿にご確認ください。</p>
+      </section>"""
+
+
 def build(summary, picks, issue_no=1):
     base = dt.date.fromisoformat(summary["base_date"])
     wk = "月火水木金土日"[base.weekday()]
@@ -415,6 +465,7 @@ def build(summary, picks, issue_no=1):
       {target_box(summary, picks, notes)}
       <div class="sec-title">全エリア総評</div>
       <p class="overall">{E(picks.get('headline', '今週の総評はありません。'))}</p>
+      {forecast_box(summary, picks)}
       <div class="sec-title">今週の狙い目</div>
       <div class="picks">{''.join(cards)}</div>
       {excluded}
@@ -618,6 +669,21 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .pick-where{font-size:12px;font-weight:700;color:var(--buoy);letter-spacing:.06em}
 .pick-fish{font-size:24px;font-weight:700;line-height:1.3}
 .pick-why{margin:4px 0 6px;font-size:14px;line-height:1.65;color:#36424d}
+.forecast{margin-top:4px}
+.fc-note{margin:0 0 8px;font-size:14px;line-height:1.75;color:#eef4f8}
+.fc-head,.fc-row{display:grid;grid-template-columns:62px repeat(2,minmax(0,1fr));gap:6px;align-items:stretch}
+.fc-day{text-align:center;font-size:12.5px;font-weight:700;color:#f6ecd6}.fc-day span{display:block;font-size:11px;font-weight:400;color:#c9a96a}
+.fc-rows{display:grid;gap:6px;margin-top:6px}
+.fc-name{font-size:12.5px;font-weight:700;color:#eef4f8;display:flex;align-items:center;line-height:1.3}
+.fc-cell{border-radius:10px;padding:6px 8px;font-size:11.5px;color:#eef4f8;background:rgba(255,255,255,.07);border-left:4px solid #6f8797}
+.fc-cell.good{border-left-color:#5cc08a}.fc-cell.mid{border-left-color:#e6b84a}.fc-cell.bad{border-left-color:#f07a64;background:rgba(240,122,100,.14)}
+.fc-top{display:flex;justify-content:space-between;align-items:center;gap:4px}
+.fc-wx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fc-rank{font-size:10.5px;font-weight:700;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.12);white-space:nowrap}
+.fc-cell.good .fc-rank{color:#8fe0b0}.fc-cell.mid .fc-rank{color:#f2cf75}.fc-cell.bad .fc-rank{color:#ffb3a3}
+.fc-l{margin-top:2px;white-space:nowrap}.fc-l b{font-size:14px;font-family:"Noto Serif JP",serif}.fc-l small{font-size:10px;color:#a9c6d8}
+.fc-tide{color:#c9dbe6;font-size:10.5px;white-space:normal;line-height:1.4}.fc-rain{font-size:10.5px;color:#a9c6d8}
+.fc-src{font-size:10.5px;color:#8fb0c4;margin:6px 0 0}
 .target{margin-top:18px;background:linear-gradient(160deg,rgba(240,122,100,.16),rgba(255,255,255,.06));border:1.5px solid rgba(240,122,100,.6);border-radius:16px;padding:12px 12px 6px}
 .tg-head{display:flex;align-items:center;gap:10px}
 .tg-icon{width:64px;height:34px}

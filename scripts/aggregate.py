@@ -434,6 +434,17 @@ def main():
                         else:
                             digest.append(f"- {fa['name']}: {r['days']}/{r['report_days']}日で報告\n")
 
+    fc = raw.get("forecast")
+    if fc:
+        summary["forecast"] = fc
+        digest.append("\n# 週末の海況予報（Open-Meteo。各エリアの沖合。判定・総評・ターゲットの総評に反映する）\n")
+        for d in fc["days"]:
+            digest.append(f"\n## {d}（{fc['tide'][d]}・月齢{fc['moon_age'][d]}）\n")
+            for name, per in fc["areas"].items():
+                x = per.get(d) or {}
+                tides = " ".join(f"{a}{t}" for a, t in x.get("tides", []))
+                digest.append(f"- {name}: 波{x.get('wave')}m（ウネリ{x.get('swell')}m・周期{x.get('period')}秒）/ 風{x.get('wdir')}{x.get('wind')}m/s（突風{x.get('gust')}）/ 天気コード{x.get('code')}・降水{x.get('rain')}% / {tides}\n")
+
     out = ROOT / "data" / "summary" / f"{date}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")

@@ -420,11 +420,87 @@ def fetch_umc(since, until):
     return out
 
 
+# ---- 週末の海況予報（Open-Meteo。キー不要） ----
+WDIR = ["北", "北東", "東", "南東", "南", "南西", "西", "北西"]
+
+
+def moon_age(day):
+    """その日の正午（JST）の月齢。基準: 2000-01-06 18:14 UTC の新月。"""
+    t = dt.datetime(day.year, day.month, day.day, 3, 0)  # 12:00 JST = 03:00 UTC
+    ref = dt.datetime(2000, 1, 6, 18, 14)
+    return ((t - ref).total_seconds() / 86400) % 29.530588853
+
+
+def tide_name(age):
+    a = int(round(age)) % 30
+    if a in (0, 1, 2, 14, 15, 16, 17, 29):
+        return "大潮"
+    if a in (7, 8, 9, 22, 23, 24):
+        return "小潮"
+    if a in (10, 25):
+        return "長潮"
+    if a in (11, 26):
+        return "若潮"
+    return "中潮"
+
+
+def weekend_days(base):
+    """基準日以降の最初の土日。"""
+    sat = base + dt.timedelta(days=(5 - base.weekday()) % 7)
+    if base.weekday() == 6:  # 日曜に実行したらその日だけ
+        return [base]
+    return [sat, sat + dt.timedelta(days=1)]
+
+
+def fetch_forecast(base):
+    pts = json.loads((ROOT / "config" / "forecast_points.json").read_text(encoding="utf-8"))
+    days = weekend_days(base)
+    d0, d1 = days[0].isoformat(), days[-1].isoformat()
+    out = {"days": [d.isoformat() for d in days], "tide": {d.isoformat(): tide_name(moon_age(d)) for d in days},
+           "moon_age": {d.isoformat(): round(moon_age(d), 1) for d in days}, "areas": {}}
+    for name, (la, lo) in pts.items():
+        try:
+            m = json.loads(get(f"https://marine-api.open-meteo.com/v1/marine?latitude={la}&longitude={lo}"
+                               f"&daily=wave_height_max,swell_wave_height_max,swell_wave_period_max"
+                               f"&hourly=sea_level_height_msl&timezone=Asia%2FTokyo&start_date={d0}&end_date={d1}") or "{}")
+            w = json.loads(get(f"https://api.open-meteo.com/v1/forecast?latitude={la}&longitude={lo}"
+                               f"&daily=weather_code,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,precipitation_probability_max"
+                               f"&wind_speed_unit=ms&timezone=Asia%2FTokyo&start_date={d0}&end_date={d1}") or "{}")
+        except Exception as e:  # noqa: BLE001
+            print(f"  ! 予報の取得失敗 {name}: {e}", file=sys.stderr)
+            continue
+        md, wd = m.get("daily", {}), w.get("daily", {})
+        hrs = m.get("hourly", {})
+        per = {}
+        for i, d in enumerate(out["days"]):
+            # 満潮・干潮（予報潮位の極大・極小）
+            hl = []
+            times, lv = hrs.get("time", []), hrs.get("sea_level_height_msl", [])
+            for j in range(1, len(lv) - 1):
+                if not times[j].startswith(d) or lv[j] is None or lv[j - 1] is None or lv[j + 1] is None:
+                    continue
+                if lv[j] >= lv[j - 1] and lv[j] > lv[j + 1]:
+                    hl.append(("満", times[j][11:16]))
+                elif lv[j] <= lv[j - 1] and lv[j] < lv[j + 1]:
+                    hl.append(("干", times[j][11:16]))
+            g = lambda arr: (arr[i] if arr and i < len(arr) else None)
+            wdeg = g(wd.get("wind_direction_10m_dominant"))
+            per[d] = {"wave": g(md.get("wave_height_max")), "swell": g(md.get("swell_wave_height_max")),
+                      "period": g(md.get("swell_wave_period_max")), "wind": g(wd.get("wind_speed_10m_max")),
+                      "gust": g(wd.get("wind_gusts_10m_max")),
+                      "wdir": WDIR[int((wdeg + 22.5) % 360 // 45)] if wdeg is not None else "",
+                      "code": g(wd.get("weather_code")), "rain": g(wd.get("precipitation_probability_max")), "tides": hl}
+        out["areas"][name] = per
+        time.sleep(0.3)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", help="基準日 YYYY-MM-DD（省略時は今日）")
     ap.add_argument("--days", type=int, default=35)
     ap.add_argument("--no-lastyear", action="store_true")
+    ap.add_argument("--forecast-only", action="store_true", help="既存の raw に週末の海況予報だけを足す")
     ap.add_argument("--merge", action="store_true", help="既存の data/raw/<日付>.json に無い船宿だけ取得して足す")
     a = ap.parse_args()
 
@@ -439,6 +515,12 @@ def main():
 
     cfg = json.loads((ROOT / "config" / "ports.json").read_text(encoding="utf-8"))
     p = ROOT / "data" / "raw" / f"{until}.json"
+    if a.forecast_only:
+        raw = json.loads(p.read_text(encoding="utf-8"))
+        raw["forecast"] = fetch_forecast(base)
+        p.write_text(json.dumps(raw, ensure_ascii=False, indent=1), encoding="utf-8")
+        print("forecast saved", file=sys.stderr)
+        return
     have = {}
     if a.merge and p.exists():
         for g in json.loads(p.read_text(encoding="utf-8"))["groups"]:
@@ -492,6 +574,10 @@ def main():
             ships.append({**s, "url": url, "catches": cur, "lastyear": last})
         out["groups"].append({"name": g["name"], "ships": ships})
 
+    try:
+        out["forecast"] = fetch_forecast(base)
+    except Exception as e:  # noqa: BLE001
+        print(f"  ! 週末の海況予報を取得できませんでした: {e}", file=sys.stderr)
     out["fetch_stats"] = STATS
     total = STATS["ok"] + STATS["fail"]
     print(f"取得: 成功 {STATS['ok']} / 失敗 {STATS['fail']}", file=sys.stderr)
