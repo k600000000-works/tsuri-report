@@ -72,6 +72,15 @@ def num(v):
     return "—" if v is None else (f"{v:g}" if v < 10 else f"{v:.0f}")
 
 
+def wt(r):
+    """型（重さ）の表示。例: 型 0.4〜2.3kg（最大2.8）"""
+    if not r.get("w_hi"):
+        return ""
+    lo, hi, mx = r["w_lo"], r["w_hi"], r.get("w_max")
+    f = lambda v: f"{v:.1f}".rstrip("0").rstrip(".")
+    return f'型 {f(lo)}〜{f(hi)}kg' + (f'（最大{f(mx)}）' if mx and mx > hi else "")
+
+
 def cnt(v):
     """幅の表示用。小さい数は小数1桁、それ以外は整数。"""
     if v is None:
@@ -173,7 +182,7 @@ def fish_rows(g, notes, weeks=()):
             <div class="r-name">{E(r['fish'])}{badge}</div>
             <div class="r-trend">前週 {pct(r['wow'])}<span class="sep"></span>前年 {pct(r['yoy'])}</div>
           </div>
-          <div class="r-num"><span class="r-lab">スソ〜竿頭</span>{rng(r.get('lo_typ'), r.get('hi_typ'), r['unit'])}<span class="r-mid">目安 <b>{num(r['avg'])}</b></span><span class="r-top">週最高 {num(r['top'])}{size}</span></div>
+          <div class="r-num"><span class="r-lab">スソ〜竿頭</span>{rng(r.get('lo_typ'), r.get('hi_typ'), r['unit'])}<span class="r-mid">目安 <b>{num(r['avg'])}</b></span><span class="r-top">週最高 {num(r['top'])}{size}</span>{f'<span class="r-wt">{wt(r)}</span>' if wt(r) else ''}</div>
           <div class="r-spark">{spark(r.get('series', []), hot)}<span>{len(r.get('series', []))}週推移</span></div>
           {chips(n)}
           {f'<p class="r-note">{E(n["note"])}</p>' if n.get('note') else ''}
@@ -281,7 +290,7 @@ def pick_stats(summary, group, fish, hot=True):
         return ""
     if kind == "ship":
         big = rng(r.get("lo_typ"), r.get("hi_typ"), r["unit"])
-        sub = f'目安 <b>{num(r["avg"])}</b>{E(r["unit"])}・週最高 {num(r["top"])}'
+        sub = f'目安 <b>{num(r["avg"])}</b>{E(r["unit"])}・週最高 {num(r["top"])}' + (f'<br><b class="ps-wt">{wt(r)}</b>' if wt(r) else "")
         trend = f'前週 {pct(r.get("wow"))}<span class="sep"></span>前年 {pct(r.get("yoy"))}'
         lab = "スソ〜竿頭"
         series = r.get("series", [])
@@ -340,7 +349,8 @@ def target_box(summary, picks, notes):
                 ser = r.get("days_series", [])
             lis.append(f'<a class="tg-row{" minor" if r.get("minor") else ""}" href="#f-{E(gname)}-{E(tname)}">'
                        f'<div class="tg-where">{E(gname)}{badge}<div class="tg-trend">{trend}</div></div>'
-                       f'<div class="tg-spark">{spark(ser)}</div><div class="tg-num">{num_html}</div><span class="tg-go">›</span></a>')
+                       f'<div class="tg-spark">{spark(ser)}</div><div class="tg-num">{num_html}</div><span class="tg-go">›</span>'
+                       + (f'<div class="tg-wtline">{wt(r) or "型 情報なし"}</div>' if kind == "ship" else "") + '</a>')
         note = picks.get("targets", {}).get(tname, {})
         note = note.get("summary") if isinstance(note, dict) else note
         out.append(f"""
@@ -507,6 +517,7 @@ HOWTO = """
 
       <div class="sec-title">そのほかの表示</div>
       <dl>
+        <dt>型（タコ）</dt><dd>タコは数だけでなく重さが大事なので、各便の重さの幅（表の欄、なければ船長コメントの「0.3〜1.5kg」「400〜500g級」などの記述）を集め、その中央値を「型 0.4〜2.3kg」のように出しています。かっこ内はその週の最大。重さの記述がない船宿は含まれません。</dd>
         <dt>週最高</dt><dd>その週にエリア内で報告された最多の数（参考値）。判定には使っていません。</dd>
         <dt>前週</dt><dd>1人あたり目安の、前の週との比較。</dd>
         <dt>前年</dt><dd>前年の同じ時期（前後1週間）の1人あたり目安との比較。</dd>
@@ -623,6 +634,9 @@ h1,h2,h3,.pick-fish{font-family:"Noto Serif JP",serif;letter-spacing:.02em}
 .tg-num .lo{font-size:12px;color:#a9c6d8}.tg-mid{display:block;font-size:11px;color:#a9c6d8}
 .tg-spark .spark .b{fill:rgba(255,255,255,.3)}.tg-spark .spark .b-now{fill:#f07a64}
 .tg-go{color:#a9c6d8;font-size:18px}
+.tg-wtline{grid-column:1/-1;font-size:12.5px;font-weight:700;color:#ffd2c4;border-top:1px dashed rgba(255,255,255,.15);padding-top:4px;margin-top:2px}
+.r-wt{display:block;font-size:12px;font-weight:700;color:var(--buoy);white-space:nowrap}
+.ps-wt{font-size:13px!important;color:var(--buoy)!important;font-family:"Noto Sans JP",sans-serif!important}
 .pick-stats{grid-column:1/-1;display:flex;align-items:center;gap:14px;margin:4px 0 2px;padding:8px 10px;background:#f6f1e7;border-radius:10px}
 .ps-num{flex:none;line-height:1.1}
 .ps-lab{display:block;font-size:10px;color:#6b7680;margin-bottom:2px}

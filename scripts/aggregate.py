@@ -12,6 +12,7 @@ import datetime as dt
 import json
 import re
 import statistics
+import unicodedata
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -54,13 +55,50 @@ def norm(name):
     return ALIASES.get(name, name)
 
 
+WEIGHT_FISH = ("タコ",)  # 型（重さ）を重視する魚種。表に無ければコメントから読む
+
+
+def parse_weight(text, near=None):
+    """コメントから重さの幅(kg)を読む。near（魚種名）があれば、その直後に書かれたものを優先する。
+    対応: 0.3～1.5kg / 400～500g / 4～500g級 / 2kg級 / 1.2キロ"""
+    t = unicodedata.normalize("NFKC", text or "")
+    m = re.search(r"(\d+(?:\.\d+)?)\s*(?:kg|キロ)(?:級)?の\s*(?:大)?(?:マ)?(?:ダコ|タコ|蛸)", t)  # 2.5kgの大ダコ
+    if near and m:
+        return float(m.group(1)), float(m.group(1))
+    spans = [t]
+    if near:
+        mm = re.search(r"[タダ]コ|蛸", t) if near == "タコ" else None
+        i = mm.start() if mm else t.find(near)
+        others = ("マダイ", "真鯛", "鯛", "ヒラメ", "ワラサ", "ブリ", "カンパチ", "ヒラマサ", "サワラ", "アマダイ", "ハタ", "青物")
+        spans = [t[i:i + 40]] if i >= 0 else []
+        if not any(o in t for o in others):  # 別の魚の重さが混ざりうるときは、全文からは拾わない
+            spans.append(t)
+    for sp in spans:
+        m = re.search(r"(\d+(?:\.\d+)?)\s*[～~\-]\s*(\d+(?:\.\d+)?)\s*(?:kg|キロ|k|K)", sp)
+        if m:
+            return float(m.group(1)), float(m.group(2))
+        m = re.search(r"(\d{1})\s*[～~\-]\s*(\d)00\s*(?:g|グラム)", sp)  # 4～500g = 400～500g
+        if m:
+            return int(m.group(1)) / 10, int(m.group(2)) / 10
+        m = re.search(r"(\d{2,4})\s*[～~\-]\s*(\d{2,4})\s*(?:g|グラム)", sp)
+        if m:
+            return int(m.group(1)) / 1000, int(m.group(2)) / 1000
+        m = re.search(r"(\d+(?:\.\d+)?)\s*(?:kg|キロ)\s*(?:級|前後|クラス|オーバー|超)", sp)
+        if m:
+            return float(m.group(1)), float(m.group(1))
+        m = re.search(r"(\d{3,4})\s*(?:g|グラム)\s*(?:級|前後|クラス|主体)", sp)
+        if m:
+            return int(m.group(1)) / 1000, int(m.group(1)) / 1000
+    return None
+
+
 def window(catches, lo, hi):
     return [c for c in catches if lo <= c["date"] <= hi]
 
 
 def ship_stats(catches):
     """魚種 -> {'vals': [...代表値], 'top': 竿頭最大, 'unit', 'size_max', 'comments': [...]}"""
-    d = defaultdict(lambda: {"vals": [], "los": [], "his": [], "top": 0, "unit": "", "size_max": 0, "size_unit": "", "comments": [], "days": set()})
+    d = defaultdict(lambda: {"vals": [], "los": [], "his": [], "wlo": [], "whi": [], "top": 0, "unit": "", "size_max": 0, "size_unit": "", "comments": [], "days": set()})
     for c in catches:
         for f in c["fish"]:
             k = norm(f["name"])
@@ -78,6 +116,15 @@ def ship_stats(catches):
                 if su and (not e["size_unit"] or e["size_unit"] == su):
                     e["size_unit"] = su
                     e["size_max"] = max(e["size_max"], f["size_max"])
+            if any(w in k for w in WEIGHT_FISH):
+                w = None
+                if f.get("size") and re.search(r"(kg|ｋｇ|キロ)", f["size"], re.I):
+                    w = parse_weight(f["size"])
+                if not w:
+                    w = parse_weight(c.get("comment", ""), near="タコ")
+                if w and 0.05 <= w[0] <= w[1] <= 8:
+                    e["wlo"].append(w[0])
+                    e["whi"].append(w[1])
             e["days"].add(c["date"])
             if c["comment"]:
                 e["comments"].append(f"{c['date'][5:]} {c['comment'][:120]}")
@@ -313,6 +360,10 @@ def main():
                 "wow": round(now_v / prev_v - 1, 2) if prev_v else None,
                 "yoy": round(now_v / ly_v - 1, 2) if ly_v else None,
                 "avg3": avg3,
+                "w_lo": round(statistics.median([v for e in nowl for v in e["wlo"]]), 2) if any(e["wlo"] for e in nowl) else None,
+                "w_hi": round(statistics.median([v for e in nowl for v in e["whi"]]), 2) if any(e["whi"] for e in nowl) else None,
+                "w_max": max([v for e in nowl for v in e["whi"]], default=None),
+                "w_n": sum(len(e["whi"]) for e in nowl),
                 "lo_typ": group_value(nowl, "los"),  # ふつうの日のスソ
                 "hi_typ": group_value(nowl, "his"),  # ふつうの日の竿頭
                 "steady_good": good, "steady_total": total,
@@ -373,7 +424,8 @@ def main():
                 for r in g["fish"]:
                     if r["fish"] == k:
                         pct = lambda x: "—" if x is None else f"{x:+.0%}"
-                        digest.append(f"- {g['name']}: {r['lo_typ']}〜{r['hi_typ']}{r['unit']}（目安{r['avg']}）/ 前週比{pct(r['wow'])} 3週前年比{pct(r['yoy3'])} / 安定度 {r['steady_good']}/{r['steady_total']} / {r['ships']}軒{r['reports']}便\n")
+                        wt = f" / 型 {r['w_lo']}〜{r['w_hi']}kg（最大{r['w_max']}kg、{r['w_n']}便分）" if r.get("w_hi") else " / 型の情報なし"
+                        digest.append(f"- {g['name']}: {r['lo_typ']}〜{r['hi_typ']}{r['unit']}（目安{r['avg']}）/ 前週比{pct(r['wow'])} 3週前年比{pct(r['yoy3'])} / 安定度 {r['steady_good']}/{r['steady_total']} / {r['ships']}軒{r['reports']}便{wt}\n")
             for fa in summary["facilities"]:
                 for r in fa["fish"]:
                     if r["fish"] == k:
