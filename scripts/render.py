@@ -659,7 +659,7 @@ TEMPLATE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{TITLE}}</title>
 <meta property="og:title" content="{{TITLE}}">
-<meta property="og:description" content="関東の船釣り、港別・魚種別の釣果まとめ。毎週金曜更新">
+<meta property="og:description" content="関東の船釣り、港別・魚種別の釣果まとめ。毎週木曜更新">
 <link rel="apple-touch-icon" sizes="180x180" href="https://k600000000-works.github.io/tsuri-report/icons/apple-touch-icon.png?v=2">
 <link rel="icon" type="image/png" sizes="32x32" href="https://k600000000-works.github.io/tsuri-report/icons/icon-32.png?v=2">
 <link rel="icon" type="image/png" sizes="192x192" href="https://k600000000-works.github.io/tsuri-report/icons/icon-192.png?v=2">
