@@ -33,8 +33,8 @@ NUM_RE = re.compile(r'([\d.]+)')
 STATS = {"ok": 0, "fail": 0}
 
 
-def get(url):
-    for i in range(3):
+def get(url, tries=3, wait=3):
+    for i in range(tries):
         try:
             b = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30).read()
             STATS["ok"] += 1
@@ -43,11 +43,11 @@ def get(url):
             except UnicodeDecodeError:
                 return b.decode("cp932", "replace")
         except Exception as e:  # noqa: BLE001
-            if i == 2:
+            if i == tries - 1:
                 STATS["fail"] += 1
                 print(f"  ! 取得失敗 {url}: {e}", file=sys.stderr)
                 return ""
-            time.sleep(3)
+            time.sleep(wait * (i + 1))
 
 
 def clean(s):
@@ -462,10 +462,10 @@ def fetch_forecast(base):
         try:
             m = json.loads(get(f"https://marine-api.open-meteo.com/v1/marine?latitude={la}&longitude={lo}"
                                f"&daily=wave_height_max,swell_wave_height_max,swell_wave_period_max"
-                               f"&hourly=sea_level_height_msl&timezone=Asia%2FTokyo&start_date={d0}&end_date={d1}") or "{}")
+                               f"&hourly=sea_level_height_msl&timezone=Asia%2FTokyo&start_date={d0}&end_date={d1}", tries=5, wait=10) or "{}")
             w = json.loads(get(f"https://api.open-meteo.com/v1/forecast?latitude={la}&longitude={lo}"
                                f"&daily=weather_code,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,precipitation_probability_max"
-                               f"&wind_speed_unit=ms&timezone=Asia%2FTokyo&start_date={d0}&end_date={d1}") or "{}")
+                               f"&wind_speed_unit=ms&timezone=Asia%2FTokyo&start_date={d0}&end_date={d1}", tries=5, wait=10) or "{}")
         except Exception as e:  # noqa: BLE001
             print(f"  ! 予報の取得失敗 {name}: {e}", file=sys.stderr)
             continue
