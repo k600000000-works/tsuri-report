@@ -445,7 +445,13 @@ def tide_name(age):
 
 
 def weekend_days(base):
-    """基準日以降の最初の土日。"""
+    """海況を出す日。config/forecast_days.json に釣行候補日（基準日以降）があればその日、なければ基準日以降の最初の土日。"""
+    fp = ROOT / "config" / "forecast_days.json"
+    if fp.exists():
+        ds = sorted(dt.date.fromisoformat(x) for x in json.loads(fp.read_text(encoding="utf-8")).get("days", []))
+        ds = [d for d in ds if d >= base]
+        if ds:
+            return ds
     sat = base + dt.timedelta(days=(5 - base.weekday()) % 7)
     if base.weekday() == 6:  # 日曜に実行したらその日だけ
         return [base]
@@ -483,13 +489,17 @@ def fetch_forecast(base):
                     hl.append(("満", times[j][11:16]))
                 elif lv[j] <= lv[j - 1] and lv[j] < lv[j + 1]:
                     hl.append(("干", times[j][11:16]))
-            g = lambda arr: (arr[i] if arr and i < len(arr) else None)
-            wdeg = g(wd.get("wind_direction_10m_dominant"))
-            per[d] = {"wave": g(md.get("wave_height_max")), "swell": g(md.get("swell_wave_height_max")),
-                      "period": g(md.get("swell_wave_period_max")), "wind": g(wd.get("wind_speed_10m_max")),
-                      "gust": g(wd.get("wind_gusts_10m_max")),
+            # 候補日が飛び飛び（土・月など）でも合うよう、日付で引く
+            mi = md.get("time", []).index(d) if d in md.get("time", []) else None
+            wi = wd.get("time", []).index(d) if d in wd.get("time", []) else None
+            gm = lambda k: (md.get(k) or [None] * 99)[mi] if mi is not None else None
+            gw = lambda k: (wd.get(k) or [None] * 99)[wi] if wi is not None else None
+            wdeg = gw("wind_direction_10m_dominant")
+            per[d] = {"wave": gm("wave_height_max"), "swell": gm("swell_wave_height_max"),
+                      "period": gm("swell_wave_period_max"), "wind": gw("wind_speed_10m_max"),
+                      "gust": gw("wind_gusts_10m_max"),
                       "wdir": WDIR[int((wdeg + 22.5) % 360 // 45)] if wdeg is not None else "",
-                      "code": g(wd.get("weather_code")), "rain": g(wd.get("precipitation_probability_max")), "tides": hl}
+                      "code": gw("weather_code"), "rain": gw("precipitation_probability_max"), "tides": hl}
         out["areas"][name] = per
         time.sleep(0.3)
     return out
