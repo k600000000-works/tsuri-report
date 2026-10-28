@@ -57,6 +57,8 @@ FGEO = {
     "横浜の海釣り施設": {"c": [35.43, 139.66], "z": 11, "m": [["大黒", 35.462, 139.683], ["本牧", 35.416, 139.678], ["磯子", 35.397, 139.633]]},
     "東扇島西公園": {"c": [35.495, 139.748], "z": 13, "m": [["東扇島西公園", 35.4955, 139.7475]]},
     "九十九里海釣りセンター": {"c": [35.537, 140.447], "z": 12, "m": [["九十九里海釣りセンター", 35.5375, 140.4465]]},
+    "金沢水際線緑地": {"c": [35.348, 139.662], "z": 14, "m": [["金沢水際線緑地（福浦岸壁）", 35.3484, 139.6625]]},
+    "ふれーゆ裏": {"c": [35.482, 139.688], "z": 14, "m": [["ふれーゆ裏", 35.4822, 139.6885]]},
 }
 
 
@@ -215,14 +217,15 @@ def facility_rows(fa, notes, weeks=()):
             detail = "".join(f'<li><span class="s-name s-plain">{E(k)}</span><span class="s-num">{v:,}匹</span></li>' for k, v in r.get("by_facility", {}).items())
             meta = f'{r["days"]}日で釣果{"・参考値" if r["minor"] else ""}'
         else:
-            num_html = f'<span class="r-lab">今週あがった日</span><b>{r["days"]}</b><small>/{r["report_days"]}日</small>'
+            num_html = (f'<span class="r-lab">今週あがった日</span><b>{r["days"]}</b><small>/{r["report_days"]}日</small>'
+                        + (f'<span class="r-mid">投稿 <b>{r["reports"]}</b>件</span>' if r.get("reports", 0) > r["days"] else ""))
             trend = "週ごとの日数の推移"
             sp = spark(r.get("days_series", []), hot)
             chart = ""
             detail = "".join(f'<li><a href="{E(x["url"])}" target="_blank" rel="noopener"><span class="s-name">{E(x["title"][:28])}</span>'
                              f'<span class="s-num">{x["date"][5:].replace("-", "/")}{("・" + E(x["source"][:12])) if x.get("source") else ""}</span><span class="s-go">›</span></a></li>'
                              for x in r.get("posts", []))
-            meta = f'{r["days"]}日で報告'
+            meta = f'{r["days"]}日で報告' + (f'・{r["reports"]}件' if r.get("reports", 0) > r["days"] else "")
         out.append(f"""
       <details class="row{' is-hot' if hot else ''}{' minor' if r['minor'] else ''}" id="f-{E(fa['name'])}-{E(r['fish'])}">
         <summary>
@@ -377,7 +380,7 @@ def sea_rank(x):
     return "good", "良好"
 
 
-FC_ALIAS = {"横浜の海釣り施設": "横浜", "東扇島西公園": "羽田", "九十九里海釣りセンター": "九十九里"}
+FC_ALIAS = {"横浜の海釣り施設": "横浜", "東扇島西公園": "羽田", "九十九里海釣りセンター": "九十九里", "金沢水際線緑地": "金沢八景", "ふれーゆ裏": "横浜"}
 
 
 def fc_days_head(fc):

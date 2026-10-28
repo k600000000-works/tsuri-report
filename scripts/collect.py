@@ -367,6 +367,37 @@ def fetch_uosoku(place, since, until, max_pages=8):
     return out
 
 
+def fetch_anglers(area_id, since, until, max_pages=30):
+    """アングラーズ（釣果投稿アプリ）のエリアの投稿。1投稿＝1尾（魚種・サイズ）。新しい順に since まで読む。"""
+    out = []
+    for page in range(1, max_pages + 1):
+        t = get(f"https://anglers.jp/api/v2/results.json?area_id={area_id}&page={page}")
+        time.sleep(WAIT)
+        try:
+            rs = json.loads(t or "[]")
+        except ValueError:
+            break
+        if not isinstance(rs, list) or not rs:
+            break
+        newest = None
+        for r in rs:
+            d = (r.get("caught_at") or "")[:10]
+            if not d:
+                continue
+            newest = d if (newest is None or d > newest) else newest
+            name = (r.get("fish") or {}).get("name")
+            if not name or not (since <= d <= until):
+                continue
+            size = r.get("size")
+            out.append({"date": d, "title": f"{name}" + (f" {size:g}cm" if size else ""),
+                        "url": f"https://anglers.jp/catches/{r['id']}", "source": "アングラーズ",
+                        "fish": [{"name": name, "size_min": size, "size_max": size, "unit": "cm"} if size else {"name": name}],
+                        "comment": re.sub(r"\s+", " ", r.get("publish_comment") or "")[:200]})
+        if newest and newest < since:  # 並びが厳密な日付順ではないので、ページ全体が古くなったら止める
+            break
+    return out
+
+
 def release_sentences(body, limit=3):
     """「放流」を含む部分を、前後の文の区切り（句読点・絵文字）までで切り出す。"""
     def is_break(ch):
@@ -544,10 +575,14 @@ def main():
             last = [x for fac in f["codes"] for x in fetch_yfp(fac, ly_since, ly_until)] if not a.no_lastyear else []
         elif f["source"] == "uosoku":
             items, last = fetch_uosoku(f["place"], since, until), []
+        elif f["source"] == "anglers":
+            items, last = [], []
         elif f["source"] == "umc":
             items, last = fetch_umc(since, until), []
         else:
             continue
+        if f.get("anglers"):  # アングラーズの投稿も合わせて読む（堤防・公園など）
+            items += fetch_anglers(f["anglers"], since, until)
         print(f"  今期{len(items)}件 前年{len(last)}件", file=sys.stderr)
         out.setdefault("facilities", []).append({**f, "items": items, "lastyear": last})
     for g in cfg["groups"]:

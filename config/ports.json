@@ -947,7 +947,8 @@
    "source": "uosoku",
    "place": "東扇島西公園",
    "sub": "川崎市・東扇島",
-   "url": "https://uosoku.com/home/kanto/kanagawa/yokohama/oogi/"
+   "url": "https://uosoku.com/home/kanto/kanagawa/yokohama/oogi/",
+   "anglers": 123
   },
   {
    "name": "九十九里海釣りセンター",
@@ -955,6 +956,22 @@
    "source": "umc",
    "sub": "九十九里町（陸上釣り堀）",
    "url": "http://xn--nbk4em1stb5747d2j8b.com/choca/"
+  },
+  {
+   "name": "金沢水際線緑地",
+   "kind": "days",
+   "source": "anglers",
+   "anglers": 90,
+   "sub": "横浜市金沢区・福浦岸壁",
+   "url": "https://anglers.jp/areas/90"
+  },
+  {
+   "name": "ふれーゆ裏",
+   "kind": "days",
+   "source": "anglers",
+   "anglers": 106,
+   "sub": "横浜市鶴見区・ふれーゆ裏の護岸",
+   "url": "https://anglers.jp/areas/106"
   }
  ]
 }

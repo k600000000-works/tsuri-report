@@ -24,6 +24,7 @@ RECENT_DAYS = 60 # 「最近行った」とみなす日数（約2か月）
 
 # 表記ゆれの統一
 ALIASES = {
+    "チヌ": "クロダイ", "グレ": "メジナ",
     "マアジ": "アジ", "LTアジ": "アジ", "ライトアジ": "アジ",
     "ショウサイフグ": "フグ", "トラフグ": "フグ",
     "キス": "シロギス",
@@ -215,7 +216,7 @@ def agg_facility(f, weeks, trips):
     items = f.get("items", [])
     inwk = lambda it, w: w[0] <= it["date"] <= w[1]
     fish = defaultdict(lambda: {"wk_cnt": [0] * len(weeks), "days": [set() for _ in weeks], "smin": None, "smax": None,
-                                "unit": "", "by": defaultdict(int), "posts": []})
+                                "unit": "", "by": defaultdict(int), "posts": [], "n": [0] * len(weeks)})
     visitors = [0] * len(weeks)
     report_days = [set() for _ in weeks]
     seen = set()
@@ -232,6 +233,7 @@ def agg_facility(f, weeks, trips):
                 k = norm(fx["name"])
                 e = fish[k]
                 e["days"][i].add(it["date"])
+                e["n"][i] += 1  # 投稿・記事の件数（1日に何件も出る魚を見落とさないため）
                 if fx.get("count"):
                     e["wk_cnt"][i] += fx["count"]
                     if i == 0:
@@ -259,7 +261,8 @@ def agg_facility(f, weeks, trips):
         nd0 = len(e["days"][0])
         if not nd0:
             continue
-        row = {"fish": k, "days": nd0, "report_days": len(report_days[0]),
+        row = {"fish": k, "days": nd0, "report_days": len(report_days[0]), "reports": e["n"][0],
+               "reports_series": list(reversed(e["n"])),
                "days_series": list(reversed([len(d) for d in e["days"]])),
                "posts": sorted(e["posts"], key=lambda x: x["date"], reverse=True)[:8]}
         if f.get("kind") == "count":
@@ -273,12 +276,12 @@ def agg_facility(f, weeks, trips):
                         "by_facility": dict(sorted(e["by"].items(), key=lambda x: -x[1])),
                         "minor": e["wk_cnt"][0] < 5})
         else:
-            row.update({"minor": nd0 < 2 and len(report_days[0]) > 2})
+            row.update({"minor": nd0 < 2 and e["n"][0] < 3 and len(report_days[0]) > 2})
         rows.append(row)
     if f.get("kind") == "count":
         rows.sort(key=lambda r: (r["minor"], -(r["per100"] or 0)))
     else:
-        rows.sort(key=lambda r: (r["minor"], -r["days"]))
+        rows.sort(key=lambda r: (r["minor"], -r["days"], -r["reports"]))
     comments = [f"{it['date'][5:]}{('・' + it['facility']) if it.get('facility') else ''} {it.get('comment') or it.get('title', '')}"[:200]
                 for it in sorted(items, key=lambda x: x["date"], reverse=True) if inwk(it, weeks[0])][:12]
     releases = [{"date": it["date"], "text": t, "url": it.get("url", "")}
@@ -406,7 +409,8 @@ def main():
                 digest.append(f"- {r['fish']}: 100人あたり{r['per100']}匹（週計{r['total']}）/ 前週比{pct(r['wow'])} 前年比{pct(r['yoy'])} / 推移 {ser} / {r['days']}日{mark}\n")
             else:
                 ser = " → ".join(str(v) for v in r["days_series"])
-                digest.append(f"- {r['fish']}: {r['days']}/{r['report_days']}日で報告 / 日数の推移 {ser}{mark}\n")
+                rser = " → ".join(str(v) for v in r.get("reports_series", []))
+                digest.append(f"- {r['fish']}: {r['days']}/{r['report_days']}日で報告・{r.get('reports', 0)}件 / 日数の推移 {ser} / 件数の推移 {rser}{mark}\n")
         if fa.get("releases"):
             digest.append("放流情報（直近2週。好調の材料として扱う）:\n" + "".join(f"  - {x['date'][5:]} {x['text']}\n" for x in fa["releases"]))
         digest.append("コメント・投稿:\n" + "".join(f"  - {c}\n" for c in fa["comments"]))
