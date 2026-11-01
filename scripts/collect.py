@@ -389,7 +389,7 @@ def fetch_anglers(area_id, since, until, max_pages=30):
             if not name or not (since <= d <= until):
                 continue
             size = r.get("size")
-            out.append({"date": d, "title": f"{name}" + (f" {size:g}cm" if size else ""),
+            out.append({"date": d, "time": (r.get("caught_at") or "")[11:16], "title": f"{name}" + (f" {size:g}cm" if size else ""),
                         "url": f"https://anglers.jp/catches/{r['id']}", "source": "アングラーズ",
                         "fish": [{"name": name, "size_min": size, "size_max": size, "unit": "cm"} if size else {"name": name}],
                         "comment": re.sub(r"\s+", " ", r.get("publish_comment") or "")[:200]})

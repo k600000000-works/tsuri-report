@@ -417,13 +417,28 @@ def main():
 
     # ターゲット（本人が狙いを定めた魚種）: 全エリア・全施設の状況を一覧にする
     tp = ROOT / "config" / "targets.json"
-    targets = json.loads(tp.read_text(encoding="utf-8")).get("targets", []) if tp.exists() else []
+    raw_t = json.loads(tp.read_text(encoding="utf-8")).get("targets", []) if tp.exists() else []
+    tdet = [t if isinstance(t, dict) else {"fish": t} for t in raw_t]  # {"fish", "place"(固定する釣り場), "date", "time"}
+    targets = [norm(t["fish"]) for t in tdet]
     summary["targets"] = targets
+    summary["target_detail"] = [{**t, "fish": norm(t["fish"])} for t in tdet]
     if targets:
         digest.append("\n# ターゲット（本人が狙いを定めた魚種。picks の targets に総評を書く）\n")
-        for tname in targets:
-            k = norm(tname)
-            digest.append(f"\n## {k}\n")
+        for t in summary["target_detail"]:
+            k = t["fish"]
+            head = "・".join(x for x in (t.get("place"), t.get("date"), t.get("time")) if x)
+            digest.append(f"\n## {k}" + (f"（{head}）" if head else "") + "\n")
+            if t.get("place"):
+                digest.append(f"釣り場は {t['place']} に固定。総評はこの釣り場・この日時に絞って、最近の釣れた時間帯・型・釣り方と、当日の風・潮・日の出から見立てを書く。\n")
+                for fa in raw.get("facilities", []):
+                    if fa["name"] != t["place"]:
+                        continue
+                    posts = sorted((it for it in fa.get("items", []) if any(norm(x["name"]) == k for x in it.get("fish", []))),
+                                   key=lambda it: (it["date"], it.get("time", "")), reverse=True)[:25]
+                    digest.append(f"最近の投稿（新しい順、{len(posts)}件）:\n")
+                    for it in posts:
+                        sz = next((x.get("size_max") for x in it["fish"] if norm(x["name"]) == k and x.get("size_max")), None)
+                        digest.append(f"  - {it['date'][5:]} {it.get('time', '')} {f'{sz:g}cm ' if sz else ''}{(it.get('comment') or it.get('title', ''))[:120]}\n")
             for g in summary["groups"]:
                 for r in g["fish"]:
                     if r["fish"] == k:

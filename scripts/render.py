@@ -320,7 +320,9 @@ def pick_stats(summary, group, fish, hot=True):
 
 def target_box(summary, picks, notes):
     out = []
-    for tname in summary.get("targets", []):
+    details = summary.get("target_detail") or [{"fish": t} for t in summary.get("targets", [])]
+    for td in details:
+        tname, place = td["fish"], td.get("place")
         items = []
         for g in summary.get("groups", []):
             for r in g["fish"]:
@@ -334,6 +336,8 @@ def target_box(summary, picks, notes):
             st = notes.get(it[1], {}).get("fish", {}).get(tname, {}).get("status")
             val = it[2].get("hi_typ") or it[2].get("per100") or it[2].get("days") or 0
             return (it[2].get("minor", False), STATUS.get(st, ("", "", 2))[2], -val)
+        if place:
+            items = [it for it in items if it[1] == place]
         lis = []
         for kind, gname, r in sorted(items, key=rank):
             st = STATUS.get(notes.get(gname, {}).get("fish", {}).get(tname, {}).get("status", ""))
@@ -347,18 +351,22 @@ def target_box(summary, picks, notes):
                 trend = f'前週 {pct(r.get("wow"))}'
                 ser = r.get("series", [])
             else:
-                num_html = f'<b>{r["days"]}</b><small>/{r["report_days"]}日</small>'
+                num_html = f'<b>{r["days"]}</b><small>/{r["report_days"]}日</small>' + (f'<span class="tg-mid">投稿 {r["reports"]}件</span>' if r.get("reports", 0) > r["days"] else "")
                 trend = "あがった日"
                 ser = r.get("days_series", [])
             lis.append(f'<a class="tg-row{" minor" if r.get("minor") else ""}" href="#f-{E(gname)}-{E(tname)}">'
                        f'<div class="tg-where">{E(gname)}{badge}<div class="tg-trend">{trend}</div></div>'
                        f'<div class="tg-spark">{spark(ser)}</div><div class="tg-num">{num_html}</div><span class="tg-go">›</span>'
                        + (f'<div class="tg-wtline">{wt(r) or "型 情報なし"}</div>' if kind == "ship" else "") + '</a>')
+        wk = "月火水木金土日"
+        dd = dt.date.fromisoformat(td["date"]) if td.get("date") else None
+        when = "・".join(x for x in (place, f"{dd.month}/{dd.day}（{wk[dd.weekday()]}）" if dd else "", td.get("time", "")) if x)
+        when = f'<div class="tg-when">{E(when)}</div>' if when else ""
         note = picks.get("targets", {}).get(tname, {})
         note = note.get("summary") if isinstance(note, dict) else note
         out.append(f"""
       <section class="target">
-        <div class="tg-head"><div class="tg-icon">{icon(tname)}</div><div><div class="tg-kicker">TARGET</div><h2>ターゲット：{E(tname)}</h2></div></div>
+        <div class="tg-head"><div class="tg-icon">{icon(tname)}</div><div><div class="tg-kicker">TARGET</div><h2>ターゲット：{E(tname)}</h2>{when}</div></div>
         {f'<p class="tg-note">{E(note)}</p>' if note else ''}
         <div class="tg-list">{''.join(lis) or '<p class="empty">今週は報告がありませんでした。</p>'}</div>
       </section>""")
@@ -761,6 +769,7 @@ a.fc-cell{display:block;text-decoration:none}
 .tg-icon{width:64px;height:34px}
 .tg-kicker{font-size:10px;letter-spacing:.3em;color:#f3a593}
 .target h2{margin:0;font-size:21px;color:#fbe9dc}
+.tg-when{font-size:13px;opacity:.85;margin-top:2px}
 .tg-note{margin:8px 2px 6px;font-size:14px;line-height:1.75;color:#eef4f8}
 .tg-list{display:grid;gap:6px;margin-top:6px}
 .tg-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto 12px;align-items:center;gap:8px;padding:9px 10px;border-radius:12px;background:rgba(255,255,255,.07);text-decoration:none;color:#eef4f8}
