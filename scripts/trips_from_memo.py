@@ -80,7 +80,7 @@ def main():
         if not line or any(section.startswith(s) for s in SKIP_SECTIONS) or section.startswith("釣り物"):
             continue
         # 「■アジ」「シリヤケイカ」のような小見出し
-        bare = line.strip("■▼ ")
+        bare = re.sub(r"\(.*?\)", "", line.strip("■▼ ")).strip()  # 「■タチウオ(浮き)」も小見出しとして扱う
         if bare in known and len(bare) <= 8:
             sub = bare
             continue
@@ -127,7 +127,7 @@ def main():
     trips.sort(key=lambda t: t["date"], reverse=True)
     out = ROOT / "config" / "trips.json"
     out.write_text(json.dumps({"trips": trips}, ensure_ascii=False, indent=1), encoding="utf-8")
-    recent = [t for t in trips if (today - dt.date.fromisoformat(t["date"])).days <= 60 and not t["secret"]]
+    recent = [t for t in trips if (today - dt.date.fromisoformat(t["date"])).days <= 60 and not t["secret"] and t["self"] != "0"]  # 釣れなかった釣行は数えない
     print(f"saved {out}: {len(trips)}件（うち secret {sum(t['secret'] for t in trips)}件）")
     print("2か月以内:", "、".join(f"{t['date']} {t['fish']}" for t in recent) or "なし")
 

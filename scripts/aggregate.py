@@ -196,7 +196,8 @@ def load_trips(base):
             continue
         k = norm(t["fish"])
         item = {"fish": k, "when": blur(base, d), "where": t.get("area") or t.get("kind", ""), "kind": t.get("kind", ""), "self": t.get("self", "")}
-        if (base - d).days <= RECENT_DAYS:
+        zero = str(t.get("self", "")).strip() in ("0", "0匹", "0尾", "0本", "0枚", "0杯", "ボウズ")
+        if (base - d).days <= RECENT_DAYS and not zero:  # 釣れなかった釣行は「最近釣った」に数えない
             recent[k] = True
         if d.year < base.year:
             try:
