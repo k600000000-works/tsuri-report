@@ -420,14 +420,21 @@ def main():
     tp = ROOT / "config" / "targets.json"
     raw_t = json.loads(tp.read_text(encoding="utf-8")).get("targets", []) if tp.exists() else []
     tdet = [t if isinstance(t, dict) else {"fish": t} for t in raw_t]  # {"fish", "place"(固定する釣り場), "date", "time"}
-    targets = [norm(t["fish"]) for t in tdet]
+    targets = [t["fish"] if t.get("scope") else norm(t["fish"]) for t in tdet]
     summary["targets"] = targets
-    summary["target_detail"] = [{**t, "fish": norm(t["fish"])} for t in tdet]
+    summary["target_detail"] = [{**t, "fish": f} for t, f in zip(tdet, targets)]
     if targets:
         digest.append("\n# ターゲット（本人が狙いを定めた魚種。picks の targets に総評を書く）\n")
         for t in summary["target_detail"]:
             k = t["fish"]
-            head = "・".join(x for x in (t.get("place"), t.get("date"), t.get("time")) if x)
+            head = "・".join(x for x in (t.get("place"), t.get("date"), "・".join(t.get("dates", [])), t.get("time")) if x)
+            if t.get("scope") == "陸":
+                digest.append(f"\n## {k}（{head}）\n")
+                digest.append("魚種・釣り場はおまかせ。下の「陸っぱり・施設」から、この日程に向く（釣り場×魚種）を2〜4つ選び、"
+                              "picks.targets に {名前: {summary, choices: [{place, fish}]}} の形で書く。place は施設名そのまま、fish は表の魚種名そのまま。"
+                              "選ぶ基準: 報告日数・件数の推移が上向きか安定、放流、その日程の風・波（海況予報の対応エリア）、家族でも釣りやすいか。"
+                              "最近釣った魚種（釣果ゼロの釣行は除く）は避ける。summary では選んだ理由と、行くならどの日・何時ごろかまで書く。\n")
+                continue
             digest.append(f"\n## {k}" + (f"（{head}）" if head else "") + "\n")
             if t.get("place"):
                 digest.append(f"釣り場は {t['place']} に固定。総評はこの釣り場・この日時に絞って、最近の釣れた時間帯・型・釣り方と、当日の風・潮・日の出から見立てを書く。\n")

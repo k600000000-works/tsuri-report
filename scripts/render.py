@@ -334,14 +334,21 @@ def target_box(summary, picks, notes):
                 if r["fish"] == tname:
                     items.append((fa["kind"], fa["name"], r))
         def rank(it):
-            st = notes.get(it[1], {}).get("fish", {}).get(tname, {}).get("status")
+            st = notes.get(it[1], {}).get("fish", {}).get(it[2]["fish"], {}).get("status")
             val = it[2].get("hi_typ") or it[2].get("per100") or it[2].get("days") or 0
             return (it[2].get("minor", False), STATUS.get(st, ("", "", 2))[2], -val)
         if place:
             items = [it for it in items if it[1] == place]
+        if td.get("scope"):  # 魚種おまかせ: Claude が選んだ（釣り場×魚種）を並べる
+            tp = picks.get("targets", {}).get(tname, {})
+            items = []
+            for c in (tp.get("choices", []) if isinstance(tp, dict) else []):
+                for fa in summary.get("facilities", []):
+                    if fa["name"] == c.get("place"):
+                        items += [(fa["kind"], fa["name"], r) for r in fa["fish"] if r["fish"] == c.get("fish")]
         lis = []
-        for kind, gname, r in sorted(items, key=rank):
-            st = STATUS.get(notes.get(gname, {}).get("fish", {}).get(tname, {}).get("status", ""))
+        for kind, gname, r in (items if td.get("scope") else sorted(items, key=rank)):
+            st = STATUS.get(notes.get(gname, {}).get("fish", {}).get(r["fish"], {}).get("status", ""))
             badge = f'<span class="badge {st[1]}">{st[0]}</span>' if st else ""
             if kind == "ship":
                 num_html = f'{rng(r.get("lo_typ"), r.get("hi_typ"), r["unit"])}<span class="tg-mid">目安 {num(r["avg"])}</span>'
@@ -355,19 +362,19 @@ def target_box(summary, picks, notes):
                 num_html = f'<b>{r["days"]}</b><small>/{r["report_days"]}日</small>' + (f'<span class="tg-mid">投稿 {r["reports"]}件</span>' if r.get("reports", 0) > r["days"] else "")
                 trend = "あがった日"
                 ser = r.get("days_series", [])
-            lis.append(f'<a class="tg-row{" minor" if r.get("minor") else ""}" href="#f-{E(gname)}-{E(tname)}">'
-                       f'<div class="tg-where">{E(gname)}{badge}<div class="tg-trend">{trend}</div></div>'
+            lis.append(f'<a class="tg-row{" minor" if r.get("minor") else ""}" href="#f-{E(gname)}-{E(r["fish"])}">'
+                       f'<div class="tg-where">{E(gname)}{(" " + E(r["fish"])) if td.get("scope") else ""}{badge}<div class="tg-trend">{trend}</div></div>'
                        f'<div class="tg-spark">{spark(ser)}</div><div class="tg-num">{num_html}</div><span class="tg-go">›</span>'
                        + (f'<div class="tg-wtline">{wt(r) or "型 情報なし"}</div>' if kind == "ship" else "") + '</a>')
         wk = "月火水木金土日"
-        dd = dt.date.fromisoformat(td["date"]) if td.get("date") else None
-        when = "・".join(x for x in (place, f"{dd.month}/{dd.day}（{wk[dd.weekday()]}）" if dd else "", td.get("time", "")) if x)
+        dds = [dt.date.fromisoformat(x) for x in ([td["date"]] if td.get("date") else td.get("dates", []))]
+        when = "・".join(x for x in (place, "・".join(f"{d.month}/{d.day}（{wk[d.weekday()]}）" for d in dds), td.get("time", "")) if x)
         when = f'<div class="tg-when">{E(when)}</div>' if when else ""
         note = picks.get("targets", {}).get(tname, {})
         note = note.get("summary") if isinstance(note, dict) else note
         out.append(f"""
       <section class="target">
-        <div class="tg-head"><div class="tg-icon">{icon(tname)}</div><div><div class="tg-kicker">TARGET</div><h2>ターゲット：{E(tname)}</h2>{when}</div></div>
+        <div class="tg-head"><div class="tg-icon">{icon(items[0][2]["fish"] if (td.get("scope") and items) else tname)}</div><div><div class="tg-kicker">TARGET</div><h2>ターゲット：{E(tname)}</h2>{when}</div></div>
         {f'<p class="tg-note">{E(note)}</p>' if note else ''}
         <div class="tg-list">{''.join(lis) or '<p class="empty">今週は報告がありませんでした。</p>'}</div>
       </section>""")
