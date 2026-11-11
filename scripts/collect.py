@@ -5,6 +5,10 @@
   python scripts/collect.py --date 2026-10-16
 
 出力: data/raw/<基準日>.json
+
+速くするための工夫（出力は変えない）:
+  - 前年同期の釣割ページは月ごとに data/cache/lastyear/ に控え、次回からは取り直さない（リポジトリにコミットする）。
+  - 船宿・施設・海況を並べて取る。同じサイトへの同時接続は HOST_LIMIT（釣割は3、ほかは2）までで、1回ごとに WAIT 秒あける。
 """
 import argparse
 import unicodedata
@@ -14,14 +18,19 @@ import html
 import json
 import re
 import sys
+import threading
 import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 BASE = "https://www.chowari.jp"
 UA = {"User-Agent": "Mozilla/5.0 (tsuri-report weekly; personal use)"}
-WAIT = 0.6  # 先方サーバーに負担をかけないための間隔（秒）
+WAIT = 0.6  # 先方サーバーに負担をかけないための間隔（秒）。1回の取得ごとに、同じサイトの枠を持ったまま待つ
+HOST_LIMIT = {"www.chowari.jp": 3}  # 同じサイトへの同時接続の上限（ここに無いサイトは2）
+WORKERS = 6  # 船宿を何軒ずつ並べて取るか（サイトごとの上限は HOST_LIMIT で守る）
+LY_CACHE = ROOT / "data" / "cache" / "lastyear"  # 前年同期（釣割の月別ページ）の控え。1年前の釣果は変わらないので取り直さない
 
 ITEM_RE = re.compile(r'<li data-ship="(\d+)" data-choka="(\d+)" class="catch_item.*?(?=<li data-ship=|</ul>\s*<div|\Z)', re.S)
 DATE_RE = re.compile(r'catch_item_date">釣行日：(\d{4})年(\d{1,2})月(\d{1,2})日（.）\s*([^<]*)<')
@@ -31,23 +40,45 @@ NUM_RE = re.compile(r'([\d.]+)')
 
 
 STATS = {"ok": 0, "fail": 0}
+_LOCK = threading.Lock()
+_HOST_SEM = {}
+_LOCAL = threading.local()  # このスレッドで取得に失敗したか（前年の控えを欠けたまま残さないため）
+
+
+def _host_sem(url):
+    host = urllib.parse.urlsplit(url).hostname or ""
+    with _LOCK:
+        if host not in _HOST_SEM:
+            _HOST_SEM[host] = threading.BoundedSemaphore(HOST_LIMIT.get(host, 2))
+        return _HOST_SEM[host]
+
+
+def _count(key):
+    with _LOCK:
+        STATS[key] += 1
 
 
 def get(url, tries=3, wait=3):
-    for i in range(tries):
+    """取得して WAIT 秒待つ。待つ間も同じサイトの枠を持っているので、1サイトあたりの負荷は HOST_LIMIT 本ぶんまで。"""
+    with _host_sem(url):
         try:
-            b = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30).read()
-            STATS["ok"] += 1
-            try:
-                return b.decode("utf-8")
-            except UnicodeDecodeError:
-                return b.decode("cp932", "replace")
-        except Exception as e:  # noqa: BLE001
-            if i == tries - 1:
-                STATS["fail"] += 1
-                print(f"  ! 取得失敗 {url}: {e}", file=sys.stderr)
-                return ""
-            time.sleep(wait * (i + 1))
+            for i in range(tries):
+                try:
+                    b = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30).read()
+                    _count("ok")
+                    try:
+                        return b.decode("utf-8")
+                    except UnicodeDecodeError:
+                        return b.decode("cp932", "replace")
+                except Exception as e:  # noqa: BLE001
+                    if i == tries - 1:
+                        _count("fail")
+                        _LOCAL.failed = True
+                        print(f"  ! 取得失敗 {url}: {e}", file=sys.stderr)
+                        return ""
+                    time.sleep(wait * (i + 1))
+        finally:
+            time.sleep(WAIT)
 
 
 def clean(s):
@@ -108,13 +139,45 @@ def fetch_ship(ship_id, since, until, dt_param=None, max_pages=8):
             q.append(f"page={page}")
         url = f"{BASE}/ship/{ship_id}/catch/" + ("?" + "&".join(q) if q else "")
         items = parse_page(get(url), ship_id)
-        time.sleep(WAIT)
         if not items:
             break
         res += [it for it in items if since <= it["date"] <= until]
         if min(it["date"] for it in items) < since:
             break
     return res
+
+
+class LastYearCache:
+    """釣割の前年同期を月（dt=YYMM）ごとに控えておく。data/cache/lastyear/chowari-YYMM.json = {船宿ID: [釣果...]}
+
+    月別ページは月内で新しい順に並ぶので、fetch_ship と同じ最大8ページ（＝その月の新しい方から40件）を取っておけば、
+    前年同期の窓がどこにずれても fetch_ship(dt=YYMM) と同じ結果を切り出せる。1年前の釣果は変わらないので取り直さない。
+    """
+
+    def __init__(self, ym):
+        self.ym = ym
+        self.path = LY_CACHE / f"chowari-{ym}.json"
+        self.data = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
+        self.dirty = False
+
+    def get(self, ship_id, since, until):
+        items = self.data.get(ship_id)
+        if items is None:
+            _LOCAL.failed = False
+            items = fetch_ship(ship_id, "0000-00-00", "9999-99-99", dt_param=self.ym)
+            if not _LOCAL.failed:  # 取り損ねたページがある月は控えに残さない（次回取り直す）
+                with _LOCK:
+                    self.data[ship_id] = items
+                    self.dirty = True
+        return [it for it in items if since <= it["date"] <= until]
+
+    def save(self):
+        if not self.dirty:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with _LOCK:
+            body = {k: self.data[k] for k in sorted(self.data)}
+        self.path.write_text(json.dumps(body, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
 
 # ---- 船宿の公式サイト（羽田かみや・かめだや等が使っている釣果ブログ形式） ----
@@ -172,7 +235,6 @@ def fetch_blog(base, ship_id, since, until):
     day = dt.date.fromisoformat(since)
     while day.isoformat() <= until:
         res += [it for it in parse_blog(get(f"{base}/search/Archive/{day:%Y%m%d}/"), ship_id) if it["date"] == day.isoformat()]
-        time.sleep(WAIT)
         day += dt.timedelta(days=1)
     return res
 
@@ -186,7 +248,6 @@ def fetch_fv(sid, ship_id, since, until, max_pages=6):
     out = []
     for page in range(1, max_pages + 1):
         t = get(f"https://www.fishing-v.jp/choka/choka_detail.php?s={sid}&pageID={page}")
-        time.sleep(WAIT)
         boxes = FV_BOX_RE.findall(t)
         if not boxes:
             break
@@ -338,7 +399,6 @@ def fetch_uosoku(place, since, until, max_pages=8):
     out = []
     for page in range(1, max_pages + 1):
         t = get(f"https://plus.uosoku.com/search?lo={urllib.parse.quote(place)}&page={page}")
-        time.sleep(WAIT)
         blocks = re.split(r"<div class='srb'", t)[1:]
         if not blocks:
             break
@@ -372,7 +432,6 @@ def fetch_anglers(area_id, since, until, max_pages=30):
     out = []
     for page in range(1, max_pages + 1):
         t = get(f"https://anglers.jp/api/v2/results.json?area_id={area_id}&page={page}")
-        time.sleep(WAIT)
         try:
             rs = json.loads(t or "[]")
         except ValueError:
@@ -435,7 +494,6 @@ def fetch_umc(since, until):
         if not (since <= day <= until):
             continue
         t = clean(re.sub(r"<br\s*/?>", " ", get(href)))
-        time.sleep(WAIT)
         body = t.split("の釣果", 2)[-1]
         body = body.split("この釣果・ブログが良かったと思ったら")[0]
         names, rest = [], body
@@ -532,7 +590,6 @@ def fetch_forecast(base):
                       "wdir": WDIR[int((wdeg + 22.5) % 360 // 45)] if wdeg is not None else "",
                       "code": gw("weather_code"), "rain": gw("precipitation_probability_max"), "tides": hl}
         out["areas"][name] = per
-        time.sleep(0.3)
     return out
 
 
@@ -568,61 +625,85 @@ def main():
             for s in g["ships"]:
                 have[s["id"]] = s
     out = {"base_date": until, "since": since, "lastyear": [ly_since, ly_until], "groups": []}
-    for f in cfg.get("facilities", []):
-        print(f"[施設] {f['name']}", file=sys.stderr)
-        if f["source"] == "yfp":
-            items = [x for fac in f["codes"] for x in fetch_yfp(fac, since, until)]
-            last = [x for fac in f["codes"] for x in fetch_yfp(fac, ly_since, ly_until)] if not a.no_lastyear else []
-        elif f["source"] == "uosoku":
-            items, last = fetch_uosoku(f["place"], since, until), []
-        elif f["source"] == "anglers":
-            items, last = [], []
-        elif f["source"] == "umc":
-            items, last = fetch_umc(since, until), []
-        else:
-            continue
-        if f.get("anglers"):  # アングラーズの投稿も合わせて読む（堤防・公園など）
-            items += fetch_anglers(f["anglers"], since, until)
-        print(f"  今期{len(items)}件 前年{len(last)}件", file=sys.stderr)
-        out.setdefault("facilities", []).append({**f, "items": items, "lastyear": last})
-    for g in cfg["groups"]:
-        print(f"[{g['name']}] {len(g['ships'])}軒", file=sys.stderr)
-        ships = []
-        for s in g["ships"]:
-            if s["id"] in have:
-                ships.append({**have[s["id"]], **s})
-                continue
-            if s.get("source") == "fv":
-                cur = fetch_fv(s["fv_id"], s["id"], since, until)
-                last = fetch_fv(s["fv_id"], s["id"], ly_since, ly_until, max_pages=12) if (cur and not a.no_lastyear) else []
-                url = s.get("url") or f"https://www.fishing-v.jp/choka/choka_detail.php?s={s['fv_id']}"
-            elif s.get("source") == "okaju":
-                cur = fetch_okaju(s["page_url"], s["id"], since, until)
-                last = []
-                url = s.get("url") or s["page_url"]
-            elif s.get("source") == "diary":
-                cur = fetch_diary(s["diary_url"], s["id"], since, until)
-                last = []
-                url = s.get("url") or s["diary_url"]
-            elif s.get("source") == "blog":
-                cur = fetch_blog(s["base"], s["id"], since, until)
-                last = fetch_blog(s["base"], s["id"], ly_since, ly_until) if (cur and not a.no_lastyear) else []
-                url = s.get("url") or f"{s['base']}/category/Choka/"
-            else:
-                cur = fetch_ship(s["id"], since, until)
-                last = []
-                if not a.no_lastyear and cur:  # 今期に釣果がある船宿だけ前年も見る
-                    for ym in ly_months:
-                        last += fetch_ship(s["id"], ly_since, ly_until, dt_param=ym)
-                url = f"{BASE}/ship/{s['id']}/catch/"
-            print(f"  {s['name']}: 今期{len(cur)}件 前年{len(last)}件", file=sys.stderr)
-            ships.append({**s, "url": url, "catches": cur, "lastyear": last})
-        out["groups"].append({"name": g["name"], "ships": ships})
+    ly_cache = {ym: LastYearCache(ym) for ym in ly_months} if not a.no_lastyear else {}
 
-    try:
-        out["forecast"] = fetch_forecast(base)
-    except Exception as e:  # noqa: BLE001
-        print(f"  ! 週末の海況予報を取得できませんでした: {e}", file=sys.stderr)
+    def facilities():
+        res = []
+        for f in cfg.get("facilities", []):  # 施設は数が少ないので、この中では順に取る
+            log = [f"[施設] {f['name']}"]
+            if f["source"] == "yfp":
+                items = [x for fac in f["codes"] for x in fetch_yfp(fac, since, until)]
+                last = [x for fac in f["codes"] for x in fetch_yfp(fac, ly_since, ly_until)] if not a.no_lastyear else []
+            elif f["source"] == "uosoku":
+                items, last = fetch_uosoku(f["place"], since, until), []
+            elif f["source"] == "anglers":
+                items, last = [], []
+            elif f["source"] == "umc":
+                items, last = fetch_umc(since, until), []
+            else:
+                continue
+            if f.get("anglers"):  # アングラーズの投稿も合わせて読む（堤防・公園など）
+                items += fetch_anglers(f["anglers"], since, until)
+            log.append(f"  今期{len(items)}件 前年{len(last)}件")
+            print("\n".join(log), file=sys.stderr)
+            res.append({**f, "items": items, "lastyear": last})
+        return res
+
+    def forecast():
+        try:
+            return fetch_forecast(base)
+        except Exception as e:  # noqa: BLE001
+            print(f"  ! 週末の海況予報を取得できませんでした: {e}", file=sys.stderr)
+            return None
+
+    def ship(s):
+        if s.get("source") == "fv":
+            cur = fetch_fv(s["fv_id"], s["id"], since, until)
+            last = fetch_fv(s["fv_id"], s["id"], ly_since, ly_until, max_pages=12) if (cur and not a.no_lastyear) else []
+            url = s.get("url") or f"https://www.fishing-v.jp/choka/choka_detail.php?s={s['fv_id']}"
+        elif s.get("source") == "okaju":
+            cur = fetch_okaju(s["page_url"], s["id"], since, until)
+            last = []
+            url = s.get("url") or s["page_url"]
+        elif s.get("source") == "diary":
+            cur = fetch_diary(s["diary_url"], s["id"], since, until)
+            last = []
+            url = s.get("url") or s["diary_url"]
+        elif s.get("source") == "blog":
+            cur = fetch_blog(s["base"], s["id"], since, until)
+            last = fetch_blog(s["base"], s["id"], ly_since, ly_until) if (cur and not a.no_lastyear) else []
+            url = s.get("url") or f"{s['base']}/category/Choka/"
+        else:
+            cur = fetch_ship(s["id"], since, until)
+            last = []
+            if not a.no_lastyear and cur:  # 今期に釣果がある船宿だけ前年も見る
+                for ym in ly_months:
+                    last += ly_cache[ym].get(s["id"], ly_since, ly_until)
+            url = f"{BASE}/ship/{s['id']}/catch/"
+        return {**s, "url": url, "catches": cur, "lastyear": last}
+
+    # 施設・海況・船宿を並べて取る（同じサイトへの同時接続は HOST_LIMIT まで）。出力の並びは ports.json の順のまま。
+    with ThreadPoolExecutor(max_workers=2) as ex, ThreadPoolExecutor(max_workers=WORKERS) as sx:
+        fac_job = ex.submit(facilities)
+        fc_job = ex.submit(forecast)
+        jobs = [[None if s["id"] in have else sx.submit(ship, s) for s in g["ships"]] for g in cfg["groups"]]
+        for g, js in zip(cfg["groups"], jobs):
+            ships = []
+            for s, j in zip(g["ships"], js):
+                ships.append({**have[s["id"]], **s} if j is None else j.result())
+            print(f"[{g['name']}] {len(g['ships'])}軒", file=sys.stderr)
+            for s in ships:
+                print(f"  {s['name']}: 今期{len(s['catches'])}件 前年{len(s['lastyear'])}件", file=sys.stderr)
+            out["groups"].append({"name": g["name"], "ships": ships})
+        facs = fac_job.result()
+        fc = fc_job.result()
+    for c in ly_cache.values():
+        c.save()
+    # キーの並びは従来どおり（groups の後に facilities、forecast）
+    if facs:
+        out["facilities"] = facs
+    if fc is not None:
+        out["forecast"] = fc
     out["fetch_stats"] = STATS
     total = STATS["ok"] + STATS["fail"]
     print(f"取得: 成功 {STATS['ok']} / 失敗 {STATS['fail']}", file=sys.stderr)

@@ -34,9 +34,12 @@ Google ドライブの「釣りメモ」（Google ドキュメント）から、
 ## 1. 集める・集計する
 
 ```bash
-python scripts/collect.py            # 10分前後。data/raw/<日付>.json（直近5週＋前年同時期）
+python scripts/collect.py            # クラウドで15〜20分前後。data/raw/<日付>.json（直近5週＋前年同時期）
 python scripts/aggregate.py <日付>   # data/summary/<日付>.json と data/digest/<日付>.md
 ```
+
+- 前年同時期の釣割の釣果は、月ごとに `data/cache/lastyear/chowari-YYMM.json` に控えてあり、次回からは取り直さない（1年前の釣果は変わらないため）。**この控えは公開リポジトリにコミットする**（3. の `git add -A` でそのまま入る。消さない・.gitignore に入れない）。前年同期が新しい月にかかる週だけ、その月の分を取りに行くので少し長くなる。
+- 船宿は並べて取っている（釣割への同時接続は3本まで、1回ごとに0.6秒あける）。相手先の負担を増やさないため、この上限は上げない。
 
 取得に失敗した船宿があっても止めずに続ける。
 **ただし、collect.py が「取得の半分以上が失敗しました」と出した場合（digest の先頭にも警告が出る）は、レポートを公開しない（render も commit も push もしない）。** 本人あてに「今週は取得に失敗したため公開を見送った」こと、失敗の内容（例: Tunnel connection failed: 403 → 実行環境のネットワーク許可が必要）をメールで知らせて終える。
