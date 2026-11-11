@@ -972,6 +972,15 @@
    "anglers": 106,
    "sub": "横浜市鶴見区・ふれーゆ裏の護岸",
    "url": "https://anglers.jp/areas/106"
+  },
+  {
+   "name": "鹿島港魚釣園",
+   "kind": "days",
+   "source": "uosoku",
+   "place": "鹿島港魚釣園",
+   "anglers": 1336,
+   "sub": "茨城県鹿嶋市・鹿島港の北防波堤",
+   "url": "https://anglers.jp/areas/1336"
   }
  ]
 }
