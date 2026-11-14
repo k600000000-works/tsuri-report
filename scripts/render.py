@@ -53,6 +53,10 @@ GEO = {
 }
 
 
+# 横浜の海釣り施設の、施設ごとの釣果ページ
+YFP_URL = {n: f"https://yokohama-fishingpiers.jp/{c}/fishing-history" for n, c in (("大黒", "daikoku"), ("磯子", "isogo"), ("本牧", "honmoku"))}
+
+
 FGEO = {
     "横浜の海釣り施設": {"c": [35.43, 139.66], "z": 11, "m": [["大黒", 35.462, 139.683], ["本牧", 35.416, 139.678], ["磯子", 35.397, 139.633]]},
     "東扇島西公園": {"c": [35.495, 139.748], "z": 13, "m": [["東扇島西公園", 35.4955, 139.7475]]},
@@ -215,7 +219,9 @@ def facility_rows(fa, notes, weeks=()):
             trend = f'前週 {pct(r.get("wow"))}<span class="sep"></span>前年 {pct(r.get("yoy"))}'
             sp = spark(r.get("series", []), hot)
             chart = line_chart({**r, "avg": r["per100"], "unit": "匹/100人"}, weeks, hot)
-            detail = "".join(f'<li><span class="s-name s-plain">{E(k)}</span><span class="s-num">{v:,}匹</span></li>' for k, v in r.get("by_facility", {}).items())
+            detail = "".join((f'<li><a href="{YFP_URL[k]}" target="_blank" rel="noopener"><span class="s-name">{E(k)}</span><span class="s-num">{v:,}匹</span><span class="s-go">›</span></a></li>'
+                              if k in YFP_URL else f'<li><span class="s-name s-plain">{E(k)}</span><span class="s-num">{v:,}匹</span></li>')
+                             for k, v in r.get("by_facility", {}).items())
             meta = f'{r["days"]}日で釣果{"・参考値" if r["minor"] else ""}'
         else:
             num_html = (f'<span class="r-lab">今週あがった日</span><b>{r["days"]}</b><small>/{r["report_days"]}日</small>'
