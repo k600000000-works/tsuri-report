@@ -553,17 +553,26 @@ def fetch_forecast(base):
     d0, d1 = days[0].isoformat(), days[-1].isoformat()
     out = {"days": [d.isoformat() for d in days], "tide": {d.isoformat(): tide_name(moon_age(d)) for d in days},
            "moon_age": {d.isoformat(): round(moon_age(d), 1) for d in days}, "areas": {}, "points": pts}
-    for name, (la, lo) in pts.items():
+    # 全地点を1回のリクエストでまとめて取る（地点ごとに取ると、クラウドでは 429 Too Many Requests で断られる）
+    names = list(pts)
+    lats = ",".join(str(pts[n][0]) for n in names)
+    lons = ",".join(str(pts[n][1]) for n in names)
+
+    def multi(url):
         try:
-            m = json.loads(get(f"https://marine-api.open-meteo.com/v1/marine?latitude={la}&longitude={lo}"
-                               f"&daily=wave_height_max,swell_wave_height_max,swell_wave_period_max"
-                               f"&hourly=sea_level_height_msl&timezone=Asia%2FTokyo&start_date={d0}&end_date={d1}", tries=5, wait=10) or "{}")
-            w = json.loads(get(f"https://api.open-meteo.com/v1/forecast?latitude={la}&longitude={lo}"
-                               f"&daily=weather_code,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,precipitation_probability_max"
-                               f"&wind_speed_unit=ms&timezone=Asia%2FTokyo&start_date={d0}&end_date={d1}", tries=5, wait=10) or "{}")
-        except Exception as e:  # noqa: BLE001
-            print(f"  ! 予報の取得失敗 {name}: {e}", file=sys.stderr)
-            continue
+            r = json.loads(get(url, tries=3, wait=30) or "[]")
+        except ValueError:
+            r = []
+        r = r if isinstance(r, list) else [r]
+        return r if len(r) == len(names) else [{}] * len(names)
+
+    ms = multi(f"https://marine-api.open-meteo.com/v1/marine?latitude={lats}&longitude={lons}"
+               f"&daily=wave_height_max,swell_wave_height_max,swell_wave_period_max"
+               f"&hourly=sea_level_height_msl&timezone=Asia%2FTokyo&start_date={d0}&end_date={d1}")
+    ws = multi(f"https://api.open-meteo.com/v1/forecast?latitude={lats}&longitude={lons}"
+               f"&daily=weather_code,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,precipitation_probability_max"
+               f"&wind_speed_unit=ms&timezone=Asia%2FTokyo&start_date={d0}&end_date={d1}")
+    for name, m, w in zip(names, ms, ws):
         md, wd = m.get("daily", {}), w.get("daily", {})
         hrs = m.get("hourly", {})
         per = {}
